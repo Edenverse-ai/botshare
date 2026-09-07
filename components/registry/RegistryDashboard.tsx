@@ -291,6 +291,7 @@ export default function RegistryDashboard({
           </form>
           {selected && (
             <IdentityPanel
+              key={`${selected.id}:${selected.version}`}
               robot={selected}
               call={call}
               busy={busy}

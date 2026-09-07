@@ -123,9 +123,11 @@ repository test artifacts.
 
 For a local production build, pass `localRegistryEnvironment()` from the provided
 launcher helper to `npm run build`; do not build against the production `.env`.
-The initial implementation passed 39 tests, two browser scenarios, typecheck,
-lint and the production build. Review added three regression tests and extended
-the condition-correction scenario. Prisma 4 emits an existing Node 22 signal-handler
+The final implementation passed 42 tests, two browser scenarios, typecheck,
+lint and the production build. Review regressions cover stale confirmations,
+image integrity, future events and condition corrections. The browser scenario
+also verifies that changing a draft clears the previous owner confirmation.
+Prisma 4 emits an existing Node 22 signal-handler
 error when build workers stop; the build still exits successfully. No production
 database migration, production registration, push or deployment was performed.
 
@@ -135,6 +137,8 @@ Standards review found no documented-rule violations. It suggested consolidating
 the duplicated inspection input validation (done) and improving the primitive
 transport/lifecycle types (a nonblocking maintainability recommendation).
 
-Spec review found four correctness issues: stale registration confirmation,
-truncated image evidence, future inspections and an inspection correction that
-invalidated readiness. Each was reproduced at the request boundary and fixed.
+Spec review found five correctness issues: stale registration confirmation at
+the API boundary, a checked owner confirmation surviving a changed draft in the
+UI, truncated image evidence, future inspections and an inspection correction
+that invalidated readiness. All were reproduced with request-boundary or browser
+regressions and fixed. Follow-up review found no remaining blocking issue.

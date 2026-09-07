@@ -71,6 +71,24 @@ test("admin can register, scan, log, correct and retire through the website", as
   await page
     .getByLabel("I confirm the recorded owner", { exact: false })
     .check();
+  // A checkbox checked against the previous owner/version must not carry over
+  // when the internal passport is refreshed after an identity edit.
+  await page
+    .getByLabel("Owner", { exact: true })
+    .fill("Corrected local test owner");
+  await page
+    .getByLabel("Reason for change", { exact: true })
+    .fill("Review changed draft owner");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(
+    page.getByLabel("I confirm the recorded owner", { exact: false }),
+  ).not.toBeChecked();
+  await page
+    .getByRole("combobox", { name: "Private nameplate image", exact: true })
+    .selectOption({ label: "test-nameplate.png" });
+  await page
+    .getByLabel("I confirm the recorded owner", { exact: false })
+    .check();
   const registration = page.waitForResponse(
     (r) => r.url().endsWith("/register") && r.request().method() === "POST",
   );
