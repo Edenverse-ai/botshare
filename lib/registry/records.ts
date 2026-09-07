@@ -7,6 +7,9 @@ const common = {
   attachmentIds: z.array(z.string().min(1)).max(10).default([]),
   correctionReason: text.optional(),
 };
+export const inspectionInput = z
+  .object({ time, inspector: text, passed: z.boolean(), reason: text })
+  .strict();
 const recordInput = z
   .discriminatedUnion("kind", [
     z
@@ -39,16 +42,7 @@ const recordInput = z
         inspectionResult: z.enum(["PENDING", "FAILED", "PASSED"]),
       })
       .strict(),
-    z
-      .object({
-        ...common,
-        kind: z.literal("INSPECTION"),
-        time,
-        inspector: text,
-        passed: z.boolean(),
-        reason: text,
-      })
-      .strict(),
+    inspectionInput.extend({ ...common, kind: z.literal("INSPECTION") }),
   ])
   .refine(
     (data) =>
@@ -111,6 +105,13 @@ export async function saveRecord(
       );
   }
   const eventAt = new Date(data.kind === "USAGE" ? data.startTime : data.time);
+  const lastReportedTime =
+    data.kind === "USAGE" ? new Date(data.endTime) : eventAt;
+  if (lastReportedTime.getTime() > Date.now() + 5 * 60 * 1000)
+    throw new RecordError(
+      400,
+      "Operational records describe completed events; timestamps cannot be in the future (five-minute clock tolerance).",
+    );
   // Corrections retain history but never retroactively restore readiness. A
   // separate, fresh inspection is the explicit recovery action.
   let condition: string | undefined;
@@ -118,7 +119,7 @@ export async function saveRecord(
     if (
       (data.kind === "DAMAGE" && data.affectsUse) ||
       data.kind === "MAINTENANCE" ||
-      (data.kind === "INSPECTION" && !data.passed)
+      (data.kind === "INSPECTION" && (!data.passed || !!previous))
     )
       condition = "MAINTENANCE";
     if (data.kind === "INSPECTION" && data.passed && !previous) {

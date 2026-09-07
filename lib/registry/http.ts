@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { isAdminEmail } from "../adminAuth";
-import { fileInput, fileMetadata, fileResponse } from "./files";
+import { validateFile, fileMetadata, fileResponse } from "./files";
 import { readPublicPassport } from "./passport";
 import QRCode from "qrcode";
-import { RecordError, saveRecord } from "./records";
+import { RecordError, saveRecord, inspectionInput } from "./records";
 
 type Actor = { id: string; email: string | null };
 type Dependencies = { db: PrismaClient; actor: () => Promise<Actor | null> };
@@ -363,7 +363,7 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
             });
             if (!robot) throw new RegistryError(404, "Robot not found.");
             if (parts[2] === "files") {
-              const file = fileInput.parse(body);
+              const file = await validateFile(body);
               result = await tx.robotFile.create({
                 data: { ...file, robotId: robot.id },
                 select: fileMetadata,
@@ -382,9 +382,15 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
                 .object({
                   ownerConfirmed: z.literal(true),
                   nameplateId: z.string().min(1),
+                  version: z.number().int().positive(),
                 })
                 .strict()
                 .parse(body);
+              if (!robot.publicId && robot.version !== data.version)
+                throw new RegistryError(
+                  409,
+                  "The draft changed. Reload and review the owner and identity before confirming registration.",
+                );
               if (!robot.model || !robot.serialKey || !robot.ownerName)
                 throw new RegistryError(
                   400,
@@ -438,15 +444,7 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
                 });
               }
             } else if (parts[2] === "inspection") {
-              const data = z
-                .object({
-                  passed: z.boolean(),
-                  reason: text.min(1),
-                  inspector: text.min(1),
-                  time: z.string().datetime({ offset: true }),
-                })
-                .strict()
-                .parse(body);
+              const data = inspectionInput.parse(body);
               if (robot.lifecycle !== "REGISTERED")
                 throw new RegistryError(
                   409,

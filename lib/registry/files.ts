@@ -1,6 +1,7 @@
 import { z } from "zod";
+import sharp from "sharp";
 
-export const fileInput = z
+const fileInput = z
   .object({
     kind: z.enum(["NAMEPLATE", "PRESENTATION", "ATTACHMENT"]),
     name: z.string().trim().min(1).max(150),
@@ -38,6 +39,32 @@ export const fileMetadata = {
   mime: true,
   createdAt: true,
 } as const;
+export async function validateFile(input: unknown) {
+  const file = fileInput.parse(input);
+  if (file.mime !== "application/pdf") {
+    try {
+      // Decode, rather than trusting a signature or metadata-only header. Keep
+      // the original evidence bytes; only the validation output is discarded.
+      await sharp(file.bytes, {
+        failOn: "warning",
+        limitInputPixels: 25_000_000,
+      })
+        .resize(1, 1)
+        .raw()
+        .toBuffer();
+    } catch {
+      throw new z.ZodError([
+        {
+          code: z.ZodIssueCode.custom,
+          path: ["file"],
+          message:
+            "Upload a complete, decodable image of at most 25 megapixels.",
+        },
+      ]);
+    }
+  }
+  return file;
+}
 export function fileResponse(file: { mime: string; bytes: Buffer }) {
   return new Response(new Uint8Array(file.bytes), {
     headers: {

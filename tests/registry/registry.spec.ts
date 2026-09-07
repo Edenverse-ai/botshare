@@ -2,7 +2,7 @@ import { test, expect, APIRequestContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 
 const png = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1sAAAAASUVORK5CYII=",
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC",
   "base64",
 );
 async function authenticate(request: APIRequestContext, email: string) {
@@ -51,18 +51,14 @@ test("admin can register, scan, log, correct and retire through the website", as
   );
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   const robot = await (await creation).json();
-  const upload = page
-    .locator("form")
-    .filter({
-      has: page.getByRole("button", { name: "Upload evidence", exact: true }),
-    });
-  await upload
-    .getByLabel("File (up to 5 MB)", { exact: true })
-    .setInputFiles({
-      name: "test-nameplate.png",
-      mimeType: "image/png",
-      buffer: png,
-    });
+  const upload = page.locator("form").filter({
+    has: page.getByRole("button", { name: "Upload evidence", exact: true }),
+  });
+  await upload.getByLabel("File (up to 5 MB)", { exact: true }).setInputFiles({
+    name: "test-nameplate.png",
+    mimeType: "image/png",
+    buffer: png,
+  });
   await upload
     .getByRole("button", { name: "Upload evidence", exact: true })
     .click();

@@ -90,6 +90,7 @@ export default function IdentityPanel({
               await call(`robots/${robot.id}/register`, "POST", {
                 nameplateId: form.get("nameplateId"),
                 ownerConfirmed: form.get("ownerConfirmed") === "on",
+                version: robot.version,
               });
               await reload();
             });

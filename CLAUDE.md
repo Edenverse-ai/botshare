@@ -164,7 +164,6 @@ nonproduction resources; this authorization does not include production migratio
 or deployment. Registry access requires explicit environment configuration and
 must never fall back to the production credentials in the local `.env` file.
 
-
 - Do not redesign the Prisma schema without explicit request.
 - Keep existing route shapes (`/listings/[listingId]`, `/api/listings`, `/api/reservations`, `/api/checkout`, etc.).
 - `Listing.category` → one of the 3 service categories.

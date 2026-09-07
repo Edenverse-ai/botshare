@@ -11,7 +11,7 @@ Services, bookings, payment, external operational roles and RWA are not connecte
 
 ## Run the isolated local demonstration
 
-Prerequisites: Docker, Node.js and installed npm dependencies.
+Prerequisites: Docker, Node.js 20.9 or later and installed npm dependencies.
 
 ```sh
 npm ci
@@ -70,12 +70,16 @@ can be tested. That compatibility script is not a production migration.
 - Formal registration requires a model, normalized unique manufacturer serial,
   private nameplate evidence and owner confirmation. Permanent numbers are
   database-unique, immutable, nonzero and never recycled. Gaps are permitted.
+  Registration also binds the confirmation to the reviewed draft version;
+  another administrator's edit requires reloading and reconfirming.
 - Files are stored durably in Postgres, limited to 5 MB each. This deliberately
   avoids another storage service for the three-machine pilot. Nameplates and
   operational attachments are private; presentation images have a distinct
   purpose and are published only when explicitly selected. Backups of the
   registry database must include file bytes. No public service image bucket is
-  used. Registry tables have RLS enabled without public policies.
+  used. Images are decoded to verify their contents, with a 25-megapixel limit;
+  a header-only or truncated image cannot satisfy registration evidence.
+  Registry tables have RLS enabled without public policies.
 - Public passports expose only Robot ID, brand, model and the selected
   presentation image. Knowing a private file ID is not sufficient to read it.
 - Records retain event time, actual operator/technician, recorder and recording
@@ -85,7 +89,9 @@ can be tested. That compatibility script is not a production migration.
 - Registration does not imply readiness. Damage that affects use and maintenance
   mark the robot as requiring maintenance. A separate inspection can restore
   readiness only if it is not older than the latest condition event. Corrections
-  never restore readiness. Retired machines cannot be reactivated by inspection.
+  never restore readiness; correcting an inspection requires a fresh check.
+  Future operational events are rejected with a five-minute clock tolerance.
+  Retired machines cannot be reactivated by inspection.
 - History has no cascading dependency on login accounts or services. Model
   removal is restricted while referenced. Actor attribution is retained as a
   snapshot. Application operations cannot delete robot identities or original
@@ -118,6 +124,17 @@ repository test artifacts.
 For a local production build, pass `localRegistryEnvironment()` from the provided
 launcher helper to `npm run build`; do not build against the production `.env`.
 The initial implementation passed 39 tests, two browser scenarios, typecheck,
-lint and the production build. Prisma 4 emits an existing Node 22 signal-handler
+lint and the production build. Review added three regression tests and extended
+the condition-correction scenario. Prisma 4 emits an existing Node 22 signal-handler
 error when build workers stop; the build still exits successfully. No production
 database migration, production registration, push or deployment was performed.
+
+## Review record
+
+Standards review found no documented-rule violations. It suggested consolidating
+the duplicated inspection input validation (done) and improving the primitive
+transport/lifecycle types (a nonblocking maintainability recommendation).
+
+Spec review found four correctness issues: stale registration confirmation,
+truncated image evidence, future inspections and an inspection correction that
+invalidated readiness. Each was reproduced at the request boundary and fixed.

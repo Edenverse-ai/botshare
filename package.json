@@ -62,6 +62,7 @@
     "react-toastify": "^9.1.2",
     "react-world-flags": "^1.5.1",
     "resend": "^6.9.4",
+    "sharp": "^0.35.4",
     "stripe": "^20.4.1",
     "tailwind-scrollbar": "^3.0.0",
     "typescript": "5.0.3",

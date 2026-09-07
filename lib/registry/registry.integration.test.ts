@@ -45,7 +45,7 @@ async function request(
 }
 afterAll(() => db.$disconnect());
 const png =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1sAAAAASUVORK5CYII=";
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC";
 async function registeredRobot() {
   const model = await db.robotModel.create({
     data: {
@@ -78,6 +78,7 @@ async function registeredRobot() {
     await request(`robots/${draft.id}/register`, "POST", {
       ownerConfirmed: true,
       nameplateId: nameplate.id,
+      version: draft.version,
     })
   ).json();
 }
@@ -179,11 +180,15 @@ describe.skipIf(!enabled)(
           name: "test.png",
           mime: "image/png",
           base64:
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1sAAAAASUVORK5CYII=",
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC",
         })
       ).json();
       const key = randomUUID();
-      const body = { ownerConfirmed: true, nameplateId: image.id };
+      const body = {
+        ownerConfirmed: true,
+        nameplateId: image.id,
+        version: robot.version,
+      };
       const results = await Promise.all([
         request(`robots/${robot.id}/register`, "POST", body, key),
         request(`robots/${robot.id}/register`, "POST", body, key),
@@ -415,6 +420,27 @@ describe.skipIf(!enabled)(
       expect(
         (await (await request(`robots/${robot.id}`)).json()).condition,
       ).toBe("USABLE");
+      const inspected = await (await request(`robots/${robot.id}`)).json();
+      const passed = inspected.records.find(
+        (record: { kind: string; data: { passed?: boolean; time: string } }) =>
+          record.kind === "INSPECTION" &&
+          record.data.passed &&
+          new Date(record.data.time).toISOString() ===
+            "2026-09-02T12:00:00.000Z",
+      );
+      const correction = await request(
+        `robots/${robot.id}/records/${passed.id}/correct`,
+        "POST",
+        {
+          ...passed.data,
+          time: "2026-09-02T08:00:00Z",
+          correctionReason: "Inspection actually preceded the fault",
+        },
+      );
+      expect(correction.status).toBe(200);
+      expect(
+        (await (await request(`robots/${robot.id}`)).json()).condition,
+      ).toBe("MAINTENANCE");
       expect(
         (
           await request(
@@ -579,6 +605,91 @@ describe.skipIf(!enabled)(
         detail.audit.find((a: { kind: string }) => a.kind === "REGISTERED").data
           .ownerName,
       ).toBe("Hifivebot");
+    });
+    it("rejects future inspection results instead of treating a planned check as completed", async () => {
+      const robot = await registeredRobot();
+      const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      expect(
+        (
+          await request(`robots/${robot.id}/inspection`, "POST", {
+            time: future,
+            inspector: "Test inspector",
+            passed: true,
+            reason: "Future inspection",
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (await (await request(`robots/${robot.id}`)).json()).condition,
+      ).toBe("AWAITING_INSPECTION");
+    });
+    it("rejects a nameplate containing only an image signature, without image pixels", async () => {
+      const robot = await (await request("robots", "POST", {})).json();
+      expect(
+        (
+          await request(`robots/${robot.id}/files`, "POST", {
+            kind: "NAMEPLATE",
+            name: "truncated.png",
+            mime: "image/png",
+            base64: Buffer.from("89504e470d0a1a0a", "hex").toString("base64"),
+          })
+        ).status,
+      ).toBe(400);
+    });
+    it("rejects registration from a stale draft after another administrator changes the owner", async () => {
+      const model = await db.robotModel.create({
+        data: {
+          slug: randomUUID(),
+          brand: "AGIBOT",
+          model: "X2",
+          productName: "Test X2",
+          description: "Test fixture",
+          useCase: [],
+          serviceCategory: "Entertainment",
+          capabilityTag: "humanoid",
+        },
+      });
+      const draft = await (
+        await request("robots", "POST", {
+          modelId: model.id,
+          serialNumber: `TEST-STALE-${randomUUID()}`,
+        })
+      ).json();
+      const image = await (
+        await request(`robots/${draft.id}/files`, "POST", {
+          kind: "NAMEPLATE",
+          name: "test.png",
+          mime: "image/png",
+          base64: png,
+        })
+      ).json();
+      const updated = await (
+        await request(`robots/${draft.id}`, "PATCH", {
+          version: draft.version,
+          ownerName: "Another owner",
+          reason: "Correct draft owner",
+        })
+      ).json();
+      const registration = {
+        ownerConfirmed: true,
+        nameplateId: image.id,
+        version: draft.version,
+      };
+      expect(
+        (await request(`robots/${draft.id}/register`, "POST", registration))
+          .status,
+      ).toBe(409);
+      expect(
+        (await (await request(`robots/${draft.id}`)).json()).publicId,
+      ).toBeNull();
+      expect(
+        (
+          await request(`robots/${draft.id}/register`, "POST", {
+            ...registration,
+            version: updated.version,
+          })
+        ).status,
+      ).toBe(200);
     });
   },
 );
