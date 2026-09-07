@@ -12,9 +12,10 @@ import UserMenu from "./UserMenu";
 type Props = {
   currentUser?: SafeUser | null;
   isAdmin?: boolean;
+  canManageRegistry?: boolean;
 };
 
-function Navbar({ currentUser, isAdmin = false }: Props) {
+function Navbar({ currentUser, isAdmin = false, canManageRegistry = false }: Props) {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const [scrolled, setScrolled] = useState(false);
@@ -52,7 +53,7 @@ function Navbar({ currentUser, isAdmin = false }: Props) {
               >
                 Robot Types
               </Link>
-<UserMenu currentUser={currentUser} isAdmin={isAdmin} transparent={transparent} />
+<UserMenu currentUser={currentUser} isAdmin={isAdmin} canManageRegistry={canManageRegistry} transparent={transparent} />
             </div>
           </div>
         </Container>

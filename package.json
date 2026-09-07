@@ -9,6 +9,11 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "registry:dev": "node scripts/registry-dev.mjs",
+    "registry:prepare": "node scripts/registry-dev.mjs --prepare-only",
+    "test:registry": "node scripts/registry-test.mjs",
+    "test:registry:browser": "playwright test --config playwright.registry.config.ts",
     "supabase": "npx -y supabase@latest",
     "db:migrate:sql": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/20260224103000_init_supabase_postgres/migration.sql",
     "db:migrate:data": "node scripts/migrate-mongo-to-postgres.js",
@@ -45,6 +50,7 @@
     "next": "^13.5.6",
     "next-auth": "^4.20.1",
     "next-cloudinary": "^4.1.1",
+    "qrcode": "^1.5.4",
     "query-string": "^8.1.0",
     "react": "18.2.0",
     "react-date-range": "^1.4.0",
@@ -60,12 +66,15 @@
     "tailwind-scrollbar": "^3.0.0",
     "typescript": "5.0.3",
     "world-countries": "^4.0.0",
+    "zod": "^3.25.76",
     "zustand": "^4.3.7"
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.15.8",
+    "@playwright/test": "^1.63.0",
     "@types/bcrypt": "^5.0.0",
     "@types/bcryptjs": "^2.4.6",
+    "@types/qrcode": "^1.5.5",
     "@types/react-date-range": "^1.4.4",
     "@types/react-world-flags": "^1.4.2",
     "adm-zip": "^0.5.17",
@@ -74,6 +83,7 @@
     "postcss": "^8.4.21",
     "prisma": "^4.12.0",
     "tailwindcss": "^3.3.1",
+    "tsx": "^4.20.5",
     "vitest": "^2.1.9"
   }
 }

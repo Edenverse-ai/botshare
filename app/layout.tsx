@@ -7,7 +7,7 @@ import RegisterModal from "@/components/models/RegisterModal";
 import RentModal from "@/components/models/RentModal";
 import SearchModal from "@/components/models/SearchModal";
 import Navbar from "@/components/navbar/Navbar";
-import { canManageServices } from "@/lib/adminAuth";
+import { canManageServices, isAdminEmail } from "@/lib/adminAuth";
 import { Nunito, Anton } from "next/font/google";
 import "../styles/globals.css";
 import getCurrentUser from "./actions/getCurrentUser";
@@ -46,7 +46,7 @@ export default async function RootLayout({
           <ForgotPasswordModal />
           {isAdmin && <RentModal />}
           {currentUser && <RentModal mode="individual" />}
-          <Navbar currentUser={currentUser} isAdmin={isAdmin} />
+          <Navbar currentUser={currentUser} isAdmin={isAdmin} canManageRegistry={isAdminEmail(currentUser?.email)} />
         </ClientOnly>
         <div className="pb-20 pt-28">{children}</div>
         <Footer />

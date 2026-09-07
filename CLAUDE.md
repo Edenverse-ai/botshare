@@ -150,6 +150,21 @@ User-facing UI must use only **white, gray, and black**. Replace any legacy rose
 
 ## Schema Guardrails
 
+### Approved Robot Registry exception (2026-09-08)
+
+The user explicitly authorized implementation of GitHub issues #5–#10 in
+Edenverse-ai/botshare: an independent administrator-managed Robot Registry for
+three Hifivebot-owned AGIBOT X2 robots. Additive physical-asset persistence,
+private evidence, permanent IDs, public passports, manual operational history
+and retirement are in scope. Existing authentication and Robot Model terminology
+are reused; service, booking, payment and role-system redesign remain excluded.
+This narrow implementation supersedes the earlier MVP schema restriction for
+these issues only. Development and destructive test fixtures must use isolated
+nonproduction resources; this authorization does not include production migration
+or deployment. Registry access requires explicit environment configuration and
+must never fall back to the production credentials in the local `.env` file.
+
+
 - Do not redesign the Prisma schema without explicit request.
 - Keep existing route shapes (`/listings/[listingId]`, `/api/listings`, `/api/reservations`, `/api/checkout`, etc.).
 - `Listing.category` → one of the 3 service categories.

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import ClientOnly from "./ClientOnly";
 import { SERVICE_CATEGORY_META } from "@/lib/serviceCategories";
@@ -71,15 +72,20 @@ function FooterColumn({
 
 function Footer() {
   const [country, setCountry] = useState("United States");
+  const pathname = usePathname();
+  const isRegistry = pathname === '/admin/robots' || !!pathname?.startsWith('/robot-passports/');
 
   useEffect(() => {
+    if (isRegistry) return;
     fetch(
       `https://extreme-ip-lookup.com/json/?key=${process.env.NEXT_PUBLIC_LOOKUP_KEY}`
     )
       .then((res) => res.json())
       .then((data) => setCountry(data.country))
       .catch(() => {});
-  }, []);
+  }, [isRegistry]);
+
+  if (isRegistry) return <footer className="border-t px-5 py-6 text-sm text-neutral-500">Hifivebot · Robot registry</footer>;
 
   return (
     <ClientOnly>

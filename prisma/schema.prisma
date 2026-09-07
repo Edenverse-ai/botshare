@@ -181,8 +181,8 @@ model EmailVerificationCode {
 // Curated catalog of robots a provider can pick from when creating a listing.
 // Seeded from data/robot-catalog/ via scripts/seed-robot-catalog.mjs.
 model RobotModel {
-  id              String    @id @default(cuid())
-  slug            String    @unique // "<brand>-<model>"; stable upsert key + Cloudinary public_id
+  id              String       @id @default(cuid())
+  slug            String       @unique // "<brand>-<model>"; stable upsert key + Cloudinary public_id
   brand           String
   model           String
   productName     String
@@ -193,16 +193,97 @@ model RobotModel {
   priceDaily      Int? // USD per-day rental price, null if not offered
   priceMonthly    Int? // USD per-month rental price, null if not offered
   useCase         String[] // zero or more of the 6 canonical use cases
-  listable        Boolean   @default(false) // shows in the create-service robot picker
+  listable        Boolean      @default(false) // shows in the create-service robot picker
   serviceCategory String // one of the 3 canonical service categories
   capabilityTag   String // humanoid | quadruped | delivery | cleaning | reception | industrial | education
   imageUrl        String? // Cloudinary delivery URL, null if no source image
-  needsReview     Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  needsReview     Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
   listings        Listing[]
+  robotAssets     RobotAsset[]
 
   @@index([brand])
   @@index([serviceCategory])
   @@index([model])
+}
+
+// Physical assets are independent of services, bookings and account deletion.
+model RobotAsset {
+  id               String        @id @default(cuid())
+  modelId          String?
+  model            RobotModel?   @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  serialNumber     String?
+  serialKey        String?       @unique
+  ownerName        String        @default("Hifivebot")
+  location         String        @default("")
+  notes            String        @default("")
+  publicId         String?       @unique
+  lifecycle        String        @default("DRAFT")
+  condition        String        @default("AWAITING_INSPECTION")
+  conditionEventAt DateTime?
+  nameplateId      String?
+  presentationId   String?
+  registeredBrand  String?
+  registeredModel  String?
+  ownerConfirmedBy String?
+  ownerConfirmedAt DateTime?
+  insurance        String        @default("")
+  tracker          String        @default("")
+  version          Int           @default(1)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  audit            RobotAudit[]
+  files            RobotFile[]
+  records          RobotRecord[]
+}
+
+model RobotRecord {
+  id               String       @id @default(cuid())
+  robotId          String
+  robot            RobotAsset   @relation(fields: [robotId], references: [id], onDelete: Restrict)
+  kind             String
+  data             Json
+  eventAt          DateTime
+  actorId          String
+  actorEmail       String
+  createdAt        DateTime     @default(now())
+  supersedesId     String?      @unique
+  supersedes       RobotRecord? @relation("recordRevision", fields: [supersedesId], references: [id], onDelete: Restrict)
+  correction       RobotRecord? @relation("recordRevision")
+  correctionReason String?
+
+  @@index([robotId, createdAt])
+}
+
+model RobotFile {
+  id        String     @id @default(cuid())
+  robotId   String
+  robot     RobotAsset @relation(fields: [robotId], references: [id], onDelete: Restrict)
+  kind      String
+  name      String
+  mime      String
+  bytes     Bytes
+  createdAt DateTime   @default(now())
+
+  @@index([robotId])
+}
+
+model RobotAudit {
+  id         String     @id @default(cuid())
+  robotId    String
+  robot      RobotAsset @relation(fields: [robotId], references: [id], onDelete: Restrict)
+  kind       String
+  data       Json
+  actorId    String
+  actorEmail String
+  createdAt  DateTime   @default(now())
+
+  @@index([robotId, createdAt])
+}
+
+model RobotRequest {
+  key      String @id
+  hash     String
+  response Json
 }

@@ -19,10 +19,11 @@ import MenuItem from "./MenuItem";
 type Props = {
   currentUser?: SafeUser | null;
   isAdmin?: boolean;
+  canManageRegistry?: boolean;
   transparent?: boolean;
 };
 
-function UserMenu({ currentUser, isAdmin = false, transparent = false }: Props) {
+function UserMenu({ currentUser, isAdmin = false, canManageRegistry = false, transparent = false }: Props) {
   const router = useRouter();
   const registerModel = useRegisterModal();
   const loginModel = useLoginModel();
@@ -106,6 +107,7 @@ function UserMenu({ currentUser, isAdmin = false, transparent = false }: Props) 
                   onClick={() => { setIsOpen(false); router.push("/profile"); }}
                   label="Profile"
                 />
+                {canManageRegistry && <MenuItem onClick={() => { setIsOpen(false); router.push('/admin/robots'); }} label="Robot registry" />}
                 {isCustomer ? (
                   <>
                     <MenuItem
