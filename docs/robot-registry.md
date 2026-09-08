@@ -43,10 +43,13 @@ from the registry database setting to `DATABASE_URL`.
 
 For this integrated deployment, point registry and application database settings
 at the same intended database so they share authentication and the Robot Model
-catalog. Nonproduction access is restricted to local databases named
+catalog. Development and test access is restricted to local databases named
 `botshare_registry_*` or `registry_test_*`. The provided launcher uses only the
 dedicated local database. Production activation and migration remain separate
 operations requiring the project's normal approval and migration checks.
+Hosted staging uses `REGISTRY_ENVIRONMENT=staging` and requires an explicit
+`schema=registry_preview_*` in its registry database URL. Its Robot Model catalog
+and registry tables are isolated from production; test labels remain marked.
 
 The QR origin must be the stable address people will actually reach. A local
 `localhost` label demonstrates the flow on this computer; a physical phone needs
