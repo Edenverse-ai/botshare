@@ -1,6 +1,6 @@
 // Next 13's App Router traces retain optional native packages for every OS.
 // Trim only non-Linux build-host packages before the Netlify adapter copies them.
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 const localOnly =
@@ -20,6 +20,17 @@ async function visit(directory) {
   }
 }
 await visit(".next");
+// Next has already materialized standalone before this script runs. Netlify
+// copies that tree, so prune the same files there without touching node_modules
+// used by local development or removing either required Linux Prisma engine.
+async function pruneStandalone(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (localOnly.test(path)) await rm(path, { recursive: true, force: true });
+    else if (entry.isDirectory()) await pruneStandalone(path);
+  }
+}
+await pruneStandalone(".next/standalone");
 console.log(
   `[registry-native] Removed ${removed} local-only native trace references; Linux dependencies retained.`,
 );
