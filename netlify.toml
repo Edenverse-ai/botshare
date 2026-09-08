@@ -14,7 +14,8 @@
 # which is where the Lambda's Prisma Client searches first. Bundle both locations.
 [functions."___netlify-server-handler"]
   included_files = [
-    "node_modules/.prisma/client/**",
+    "node_modules/.prisma/client/libquery_engine-rhel-openssl-1.0.x.so.node",
+    "node_modules/.prisma/client/libquery_engine-rhel-openssl-3.0.x.so.node",
     "node_modules/@prisma/client/runtime/libquery_engine-rhel-openssl-1.0.x.so.node",
     "node_modules/@prisma/client/runtime/libquery_engine-rhel-openssl-3.0.x.so.node",
     "node_modules/@img/sharp-linux-x64/**",
