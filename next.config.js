@@ -6,7 +6,11 @@ const nextConfig = {
   // "Query engine library for current platform could not be found".
   experimental: {
     outputFileTracingIncludes: {
-      "/**/*": ["./node_modules/.prisma/client/**/*"],
+      "/**/*": [
+        "./node_modules/.prisma/client/**/*",
+        "./node_modules/@img/sharp-linux-x64/**/*",
+        "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+      ],
     },
   },
   webpack: (config) => {
