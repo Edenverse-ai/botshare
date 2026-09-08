@@ -195,6 +195,9 @@ test("admin can register, scan, log, correct and retire through the website", as
       exact: true,
     }),
   ).toBeVisible();
+  await expect(
+    page.getByLabel("Private location", { exact: true }),
+  ).toHaveCount(1);
   await page.getByText("Retire this robot", { exact: true }).click();
   await page
     .getByLabel("Retirement reason", { exact: true })
