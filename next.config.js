@@ -5,6 +5,14 @@ const nextConfig = {
   // this the rhel engine is missing at runtime and every DB query throws
   // "Query engine library for current platform could not be found".
   experimental: {
+    outputFileTracingExcludes: {
+      "/**/*": [
+        "./node_modules/@img/sharp-darwin-*/**/*",
+        "./node_modules/@img/sharp-libvips-darwin-*/**/*",
+        "./node_modules/@img/sharp-wasm32/**/*",
+        "./node_modules/.prisma/client/*darwin*",
+      ],
+    },
     outputFileTracingIncludes: {
       "/**/*": [
         "./node_modules/.prisma/client/**/*",
