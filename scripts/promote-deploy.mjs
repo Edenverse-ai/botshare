@@ -7,52 +7,31 @@
  * This script is that act. It publishes an existing build — it never builds — so it is
  * instant, costs no build minutes, and uploads nothing over the local network.
  *
- * Usage:
- *   node scripts/promote-deploy.mjs                 # promote newest ready production deploy
- *   node scripts/promote-deploy.mjs <deploy_id>     # promote a specific deploy
- *   node scripts/promote-deploy.mjs --dry-run       # check only, change nothing
- *   node scripts/promote-deploy.mjs --rollback      # republish the previously published deploy
+ * Usage (checks only unless --confirm is given):
+ *   node scripts/promote-deploy.mjs                        # preflight newest ready production deploy
+ *   node scripts/promote-deploy.mjs --confirm              # ...and publish it
+ *   node scripts/promote-deploy.mjs <deploy_id> --confirm  # publish a specific deploy
+ *   node scripts/promote-deploy.mjs --rollback --confirm   # republish the previously published deploy
+ *
+ * Publishing is opt-in so that a lost flag fails safe: PowerShell drops a bare `--`,
+ * after which npm swallows the flags meant for this script. Without --confirm the
+ * script only reports and preflights.
  *
  * Preflight before publishing: the target must be `ready`, serve 200 on its own deploy
  * URL, and render real DB rows. That last check is the one that matters — the recurring
  * failure on this repo is a function bundled without the Prisma rhel query engine, which
  * builds and serves HTML fine but throws on every DB query. See CLAUDE.md.
  */
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { DEPLOY_URL_SUFFIX, getSite, listDeploys, netlify, SITE_ID } from "./netlify-api.mjs";
 
-const DEPLOY_URL_SUFFIX = "--hifivebot-com.netlify.app";
 // A route that must hit the database. If Prisma's engine is missing this 500s.
-// `/services` is the static scenario index and touches no data, so probe a
-// scenario page — it queries listings for its category on every request.
+// `/services` lists robot tags from the catalog, but probe a scenario page too —
+// it queries listings for its category on every request.
 const DB_ROUTE = "/services/entertainment";
 // getListings() dedupes the public catalog by title, so a category renders one
 // row per distinct package (3-4 today). A missing query engine renders zero, so
 // any non-trivial count still proves the database answered.
 const MIN_DB_IDS = 3;
-
-function siteId() {
-  if (process.env.NETLIFY_SITE_ID) return process.env.NETLIFY_SITE_ID;
-  if (existsSync(".netlify/state.json")) {
-    return JSON.parse(readFileSync(".netlify/state.json", "utf8")).siteId;
-  }
-  throw new Error("no site id: set NETLIFY_SITE_ID or run `netlify link`");
-}
-
-/**
- * The Netlify CLI hangs behind the local proxy/VPN some machines here run, so every
- * call goes out with the proxy vars stripped.
- */
-function netlifyApi(method, payload) {
-  const env = { ...process.env };
-  for (const k of ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]) delete env[k];
-  const out = execFileSync(
-    "npx",
-    ["netlify", "api", method, "--data", JSON.stringify(payload)],
-    { env, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }
-  );
-  return JSON.parse(out);
-}
 
 async function get(url) {
   const res = await fetch(url, { redirect: "follow" });
@@ -60,28 +39,40 @@ async function get(url) {
 }
 
 const args = process.argv.slice(2);
-const dryRun = args.includes("--dry-run");
+const dryRun = !args.includes("--confirm");
 const rollback = args.includes("--rollback");
 const explicitId = args.find((a) => !a.startsWith("--"));
 
-const SITE = siteId();
-const deploys = netlifyApi("listSiteDeploys", { site_id: SITE, per_page: 25 });
-const published = deploys.find((d) => d.published_at) ?? null;
+const SITE = SITE_ID;
+const deploys = await listDeploys(25);
+// Ask the site which deploy is live. `published_at` stays set on every deploy that
+// was ever published, so after a rollback the newest such deploy is not the live one.
+const liveId = (await getSite()).published_deploy?.id;
+const published = deploys.find((d) => d.id === liveId) ?? null;
 
 if (!published) throw new Error("no currently published deploy found — refusing to act blind");
 
 let target;
 if (rollback) {
-  target = deploys.find((d) => d.id !== published.id && d.published_at && d.state === "ready");
+  // The most recently published deploy other than the live one.
+  target = deploys
+    .filter((d) => d.id !== published.id && d.published_at && d.state === "ready")
+    .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))[0];
   if (!target) throw new Error("no earlier published deploy to roll back to");
 } else if (explicitId) {
   target = deploys.find((d) => d.id === explicitId);
   if (!target) throw new Error(`deploy ${explicitId} not in the last 25 deploys`);
 } else {
+  // Only builds newer than the live one; anything older is a rollback, which must
+  // be asked for explicitly (--rollback or a deploy id).
   target = deploys.find(
-    (d) => d.state === "ready" && d.context === "production" && d.id !== published.id
+    (d) =>
+      d.state === "ready" &&
+      d.context === "production" &&
+      d.id !== published.id &&
+      Date.parse(d.created_at) > Date.parse(published.created_at)
   );
-  if (!target) throw new Error("no ready, unpublished production deploy to promote");
+  if (!target) throw new Error("no ready production deploy newer than the live one to promote");
 }
 
 const short = (d) =>
@@ -131,17 +122,17 @@ if (ids.size < MIN_DB_IDS) {
 }
 
 if (dryRun) {
-  console.log("\n--dry-run: preflight passed, nothing changed.");
+  console.log("\nPreflight passed, nothing changed. Add --confirm to publish this deploy.");
   process.exit(0);
 }
 
 // --- promote: unlock old, publish target, re-lock so auto-publishing stays off ---
 console.log("\npromoting...");
-netlifyApi("unlockDeploy", { deploy_id: published.id });
-netlifyApi("restoreSiteDeploy", { site_id: SITE, deploy_id: target.id });
-netlifyApi("lockDeploy", { deploy_id: target.id });
+await netlify("POST", `/deploys/${published.id}/unlock`);
+await netlify("POST", `/sites/${SITE}/deploys/${target.id}/restore`);
+await netlify("POST", `/deploys/${target.id}/lock`);
 
-const site = netlifyApi("getSite", { site_id: SITE });
+const site = await getSite();
 const now = site.published_deploy || {};
 console.log(`published: ${now.id}  locked: ${now.locked}`);
 
@@ -156,4 +147,4 @@ if (!now.locked) {
 
 const prod = await get("https://hifivebot.com/");
 console.log(`\nhttps://hifivebot.com/  ${prod.status}`);
-console.log(`\nrollback: npm run deploy:rollback   (returns to ${published.id})`);
+console.log(`\nrollback: npm run deploy:rollback -- --confirm   (returns to ${published.id})`);

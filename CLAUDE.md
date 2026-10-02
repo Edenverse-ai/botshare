@@ -24,16 +24,19 @@ This repo deploys to **hifivebot.com** (Netlify project `hifivebot-com`, site id
 
 ```bash
 git push origin main            # -> CI build; preview only, never goes live
-npm run deploy:status           # recent deploys (add --silent to pipe JSON)
-npm run deploy:logs             # stream the log of a build in progress
-npm run deploy:build            # trigger a CI build without pushing a commit
-npm run deploy:promote          # publish newest ready deploy to hifivebot.com
-npm run deploy:rollback         # republish the previously published deploy
+npm run deploy:status                         # recent deploys as JSON (-- --table for a summary)
+npm run deploy:logs                           # stream the log of a build in progress
+npm run deploy:build                          # trigger a CI build without pushing (-- --wait to follow it)
+npm run deploy:promote                        # preflight only; changes nothing
+npm run deploy:promote -- <deploy_id> --confirm   # publish that deploy to hifivebot.com
+npm run deploy:rollback -- --confirm          # republish the previously published deploy
 ```
+
+The deploy scripts (`scripts/deploy.mjs`, `scripts/promote-deploy.mjs`) call the Netlify REST API directly through `scripts/netlify-api.mjs`, so they behave the same on macOS and Windows. They authenticate with the Netlify CLI login (`npx netlify login`, once per machine). **Publishing requires `--confirm`;** without it promote/rollback only preflight. In PowerShell a bare `--` is dropped and npm then swallows the flags, so run the npm commands from `cmd`/Git Bash, or call `node scripts/promote-deploy.mjs <deploy_id> --confirm` directly.
 
 `deploy:promote` runs `scripts/promote-deploy.mjs`: it preflights the target deploy on its own URL (home 200, `/services` 200 rendering real DB rows) and refuses to publish if the database is not answering. Publishing is an API call — instant, no rebuild, no build minutes, nothing uploaded. Rollback is the same operation in reverse and equally instant. Prefer the `/prod-deploy` skill, which wraps this with a confirmation step.
 
-`npm run deploy:local` is the escape hatch for when Netlify CI is unavailable: it builds locally and publishes directly, bypassing the lock. It uploads ~32 MB and is unreliable on a flaky connection. Do not reach for it by default.
+`npm run deploy:local` is the escape hatch for when Netlify CI is unavailable (macOS/Linux only): it builds locally and uploads the result as an **unpublished** preview, which still goes through `deploy:promote`'s preflight. It refuses to run on Windows, where the build embeds `C:\` paths and every page 500s on the Linux function. It uploads ~32 MB and is unreliable on a flaky connection. Do not reach for it by default.
 
 Netlify manages env vars (DATABASE_URL, SUPABASE_*, NEXTAUTH_URL, etc.) in the site dashboard, scoped to all contexts. The `.env` file is for local dev only, and is a strict subset of what the site holds.
 

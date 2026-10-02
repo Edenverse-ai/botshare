@@ -17,26 +17,27 @@ around it: choose the right deploy, confirm with the user, run it, report.
 ### 1. See what is available
 
 ```bash
-cd /Users/jasonliu/Github/botshare
-npm run --silent deploy:status | python3 -c '
-import json,sys
-for d in json.load(sys.stdin)[:8]:
-    print(d["id"], d.get("state"), d.get("context"), (d.get("commit_ref") or "none")[:8],
-          d.get("created_at"), "PUBLISHED" if d.get("published_at") else "")
-'
+npm run --silent deploy:status -- --table
 ```
 
-`npm run` prints a banner to stdout, so `--silent` is required whenever piping JSON.
+`LIVE` marks the deploy that is published right now (asked from the site, not inferred
+from `published_at`, which stays set on every deploy that was ever published). Without
+`--table` the command prints the raw JSON; `npm run` prints a banner to stdout, so
+`--silent` is required whenever piping it.
+
+These commands work on macOS and Windows. In PowerShell a bare `--` is dropped and npm
+then swallows the script's flags — run them from `cmd` or Git Bash, or call
+`node scripts/promote-deploy.mjs ...` directly.
 
 ### 2. Preflight and show the user what would ship
 
 ```bash
-npm run deploy:promote -- --dry-run
+npm run deploy:promote
 ```
 
 This prints the currently published deploy and the target, then checks the target on its
 own deploy URL: home returns 200, and `/services` returns 200 rendering real database rows.
-It changes nothing. The DB check is the one that matters — a function bundled without the
+Without `--confirm` it changes nothing. The DB check is the one that matters — a function bundled without the
 Prisma rhel query engine serves HTML fine and throws on every query (see CLAUDE.md
 "Deployment gotchas" #1).
 
@@ -49,7 +50,7 @@ If the dry run aborts, do not try to work around it. Report the reason and stop.
 ### 3. Publish
 
 ```bash
-npm run deploy:promote
+npm run deploy:promote -- --confirm
 ```
 
 Unlocks the current deploy, publishes the target, re-locks it so auto-publishing stays off,
@@ -59,7 +60,7 @@ check `npm run --silent deploy:status` before doing anything else.
 To publish a specific deploy instead of the newest ready one:
 
 ```bash
-npm run deploy:promote -- <deploy_id>
+npm run deploy:promote -- <deploy_id> --confirm
 ```
 
 ### 4. Report
@@ -67,7 +68,7 @@ npm run deploy:promote -- <deploy_id>
 Give the user the published deploy id, the commit, the verified status codes, and:
 
 ```bash
-npm run deploy:rollback
+npm run deploy:rollback -- --confirm
 ```
 
 ## Variants
@@ -76,7 +77,7 @@ npm run deploy:rollback
   nothing built since the last publish. Trigger a build, wait for it, then promote:
 
   ```bash
-  npm run deploy:build      # costs build minutes — say so before running
+  npm run deploy:build -- --wait   # costs build minutes — say so before running
   npm run deploy:logs       # attach once state=building, to see failures
   ```
 
@@ -89,8 +90,9 @@ npm run deploy:rollback
 ## Do not
 
 - Do not run `npm run deploy:local` (or `netlify deploy --prod`) as the normal path. It
-  builds locally and uploads ~32 MB over a connection that is unreliable here, and it
-  publishes directly, bypassing the lock. It is an escape hatch for when Netlify CI is down.
+  builds locally and uploads ~32 MB over a connection that is unreliable here. It is an
+  escape hatch for when Netlify CI is down, macOS/Linux only (a Windows build 500s on every
+  page), and its upload is an unpublished preview that still needs `deploy:promote`.
 - Do not leave the published deploy unlocked. Unlocked means every push to `main` goes
   straight to production. `promote-deploy.mjs` re-locks and fails loudly if it cannot.
 - Do not set `PRISMA_CLI_BINARY_TARGETS` to fix an engine problem — Prisma 4.12 rejects

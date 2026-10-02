@@ -20,12 +20,12 @@
     "db:migrate:verify": "node scripts/verify-migration.js",
     "db:seed": "prisma db seed",
     "build:netlify": "prisma generate && node scripts/bundle-prisma-engines.mjs && node scripts/bundle-registry-native.mjs && next build && node scripts/prune-server-traces.mjs",
-    "deploy:build": "env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy npx netlify api createSiteBuild --data '{\"site_id\":\"79afde94-abbe-422c-ba4c-f68ab0100e62\",\"clear_cache\":false}'",
-    "deploy:logs": "env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy npx netlify logs:deploy",
-    "deploy:status": "env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy npx netlify api listSiteDeploys --data '{\"site_id\":\"79afde94-abbe-422c-ba4c-f68ab0100e62\",\"per_page\":10}'",
+    "deploy:build": "node scripts/deploy.mjs build",
+    "deploy:logs": "node scripts/deploy.mjs logs",
+    "deploy:status": "node scripts/deploy.mjs status",
     "deploy:promote": "node scripts/promote-deploy.mjs",
     "deploy:rollback": "node scripts/promote-deploy.mjs --rollback",
-    "deploy:local": "env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy npx netlify build && env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy npx netlify deploy --prod --site 79afde94-abbe-422c-ba4c-f68ab0100e62"
+    "deploy:local": "node scripts/deploy.mjs local"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
