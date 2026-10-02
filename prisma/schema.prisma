@@ -230,6 +230,12 @@ model RobotAsset {
   ownerConfirmedAt DateTime?
   insurance        String        @default("")
   tracker          String        @default("")
+  // Spec HFB-TECH-ID-001 Phase 1 asset fields; all optional at entry.
+  replacementValue Decimal?      @db.Decimal(12, 2)
+  currency         String        @default("USD")
+  operatingHours   Decimal?      @db.Decimal(10, 1)
+  firmwareVersion  String?
+  oemDeviceId      String?
   version          Int           @default(1)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt

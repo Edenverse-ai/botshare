@@ -9,6 +9,7 @@ export type Robot = {
   version: number;
   ownerName: string;
   modelId: string | null;
+  model?: { brand: string; model: string } | null;
   serialNumber: string | null;
   location: string;
   notes: string;
@@ -19,6 +20,12 @@ export type Robot = {
   presentationId: string | null;
   insurance: string;
   tracker: string;
+  // Prisma serialises Decimal columns as strings.
+  replacementValue: string | null;
+  currency: string;
+  operatingHours: string | null;
+  firmwareVersion: string | null;
+  oemDeviceId: string | null;
   files?: RobotFile[];
   records?: OperationalRecord[];
   audit?: {

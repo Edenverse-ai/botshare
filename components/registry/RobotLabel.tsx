@@ -16,7 +16,8 @@ export default function RobotLabel({
     url: string;
   } | null>(null);
   return (
-    <section className="rounded-xl border p-4">
+    <section id="label" className="space-y-3 rounded-xl border p-4">
+      <h2 className="text-xl font-semibold">QR label</h2>
       <button
         className={button}
         disabled={busy}

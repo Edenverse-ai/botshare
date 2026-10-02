@@ -54,7 +54,7 @@ test("admin can register, scan, log, correct and retire through the website", as
   const upload = page.locator("form").filter({
     has: page.getByRole("button", { name: "Upload evidence", exact: true }),
   });
-  await upload.getByLabel("File (up to 5 MB)", { exact: true }).setInputFiles({
+  await upload.getByLabel("Photo or PDF", { exact: false }).setInputFiles({
     name: "test-nameplate.png",
     mimeType: "image/png",
     buffer: png,
@@ -73,6 +73,7 @@ test("admin can register, scan, log, correct and retire through the website", as
     .check();
   // A checkbox checked against the previous owner/version must not carry over
   // when the internal passport is refreshed after an identity edit.
+  await page.getByRole("button", { name: "Edit details", exact: true }).click();
   await page
     .getByLabel("Owner", { exact: true })
     .fill("Corrected local test owner");
@@ -127,17 +128,15 @@ test("admin can register, scan, log, correct and retire through the website", as
     })
     .click();
   await page.getByRole("link", { name: "Administrator access" }).click();
-  await expect(page.getByLabel("Manufacturer serial number")).toHaveValue(
-    serial,
-  );
+  await expect(page.getByText(`S/N ${serial}`, { exact: false })).toBeVisible();
 
   await page.getByLabel("Start time", { exact: true }).fill("2026-09-01T09:00");
   await page.getByLabel("End time", { exact: true }).fill("2026-09-01T10:00");
-  await page.getByLabel("purpose", { exact: true }).fill("Browser rehearsal");
+  await page.getByLabel("Purpose", { exact: true }).fill("Browser rehearsal");
   await page
     .getByLabel("Actual operator", { exact: true })
     .fill("Demo operator");
-  await page.getByLabel("result", { exact: true }).fill("Completed");
+  await page.getByLabel("Outcome", { exact: true }).fill("Completed");
   await page.getByRole("button", { name: "Save record", exact: true }).click();
   await expect(
     page.getByText("Browser rehearsal", { exact: true }),
@@ -146,7 +145,7 @@ test("admin can register, scan, log, correct and retire through the website", as
     .getByRole("button", { name: "Correct record", exact: true })
     .click();
   await page
-    .getByLabel("result", { exact: true })
+    .getByLabel("Outcome", { exact: true })
     .fill("Completed with correction");
   await page
     .getByLabel("Correction reason", { exact: true })
@@ -161,7 +160,7 @@ test("admin can register, scan, log, correct and retire through the website", as
     .selectOption("DAMAGE");
   await page.getByLabel("Event time", { exact: true }).fill("2026-09-02T09:00");
   await page
-    .getByLabel("description", { exact: true })
+    .getByLabel("Description", { exact: true })
     .fill("Simulated joint fault");
   await page.getByRole("button", { name: "Save record", exact: true }).click();
   await expect(
@@ -171,8 +170,8 @@ test("admin can register, scan, log, correct and retire through the website", as
     .getByRole("combobox", { name: "Record type", exact: true })
     .selectOption("MAINTENANCE");
   await page.getByLabel("Event time", { exact: true }).fill("2026-09-02T10:00");
-  await page.getByLabel("work", { exact: true }).fill("Simulated repair");
-  await page.getByLabel("technician", { exact: true }).fill("Demo technician");
+  await page.getByLabel("Work performed", { exact: true }).fill("Simulated repair");
+  await page.getByLabel("Technician", { exact: true }).fill("Demo technician");
   await page.getByRole("button", { name: "Save record", exact: true }).click();
   await expect(
     page.getByText("Simulated repair", { exact: true }),
@@ -190,13 +189,9 @@ test("admin can register, scan, log, correct and retire through the website", as
   await page
     .getByRole("button", { name: "Save inspection", exact: true })
     .click();
+  await expect(page.getByText("Ready for use", { exact: true })).toBeVisible();
   await expect(
-    page.getByText(`${registered.publicId} · REGISTERED · USABLE`, {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByLabel("Private location", { exact: true }),
+    page.getByText("Private location", { exact: true }),
   ).toHaveCount(1);
   await page.getByText("Retire this robot", { exact: true }).click();
   await page

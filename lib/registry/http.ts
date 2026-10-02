@@ -18,6 +18,23 @@ export class RegistryError extends Error {
   }
 }
 const text = z.string().trim().max(2000);
+const optionalText = z
+  .string()
+  .trim()
+  .max(100)
+  .transform((value) => value || null)
+  .nullable()
+  .optional();
+// Money and meter readings: non-negative, rounded to the column's scale.
+const amount = (scale: number, max: number) =>
+  z
+    .number()
+    .finite()
+    .nonnegative()
+    .max(max)
+    .transform((value) => Math.round(value * 10 ** scale) / 10 ** scale)
+    .nullable()
+    .optional();
 const draftFields = z
   .object({
     modelId: z.string().min(1).nullable().optional(),
@@ -29,6 +46,16 @@ const draftFields = z
     tracker: text.optional(),
     nameplateId: z.string().min(1).nullable().optional(),
     presentationId: z.string().min(1).nullable().optional(),
+    replacementValue: amount(2, 9_999_999_999.99),
+    currency: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{3}$/, "Use a three-letter currency code such as USD.")
+      .optional(),
+    operatingHours: amount(1, 999_999_999.9),
+    firmwareVersion: optionalText,
+    oemDeviceId: optionalText,
   })
   .strict();
 const updateFields = draftFields.extend({

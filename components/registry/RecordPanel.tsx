@@ -1,6 +1,12 @@
 "use client";
 import { useState } from "react";
 import { RobotPanelProps, OperationalRecord, button, field } from "./types";
+import {
+  RECORD_FIELD_LABELS,
+  RECORD_KIND_LABELS,
+  formatDateTime,
+  recordRows,
+} from "./labels";
 
 function localTime(value: unknown) {
   if (typeof value !== "string") return "";
@@ -23,8 +29,8 @@ export default function RecordPanel({
     robot.records?.map((r) => r.supersedesId).filter(Boolean),
   );
   return (
-    <section className="space-y-4 rounded-xl border p-4">
-      <h2 className="text-xl font-semibold">Manual operational records</h2>
+    <section id="records" className="space-y-4 rounded-xl border p-4">
+      <h2 className="text-xl font-semibold">Operational records</h2>
       <p className="text-sm text-neutral-600">
         Human reports, not device-verified activity. Times are entered in your
         local timezone and retained with their UTC offset.
@@ -152,8 +158,8 @@ export default function RecordPanel({
               ? ["work", "technician"]
               : ["inspector", "reason"]
         ).map((name) => (
-          <label key={name} className="capitalize">
-            {name === "operator" ? "Actual operator" : name}
+          <label key={name}>
+            {RECORD_FIELD_LABELS[name] ?? name}
             <input
               className={field}
               name={name}
@@ -264,24 +270,21 @@ export default function RecordPanel({
         {robot.records?.map((record) => (
           <article className="rounded border p-3" key={record.id}>
             <p className="font-semibold">
-              {record.kind} · {new Date(record.eventAt).toLocaleString()}{" "}
+              {RECORD_KIND_LABELS[record.kind] ?? record.kind} ·{" "}
+              {formatDateTime(record.eventAt)}{" "}
               {superseded.has(record.id) && "· Earlier revision"}
             </p>
-            <p className="text-sm">
+            <p className="text-sm text-neutral-500">
               Recorded by {record.actorEmail} at{" "}
-              {new Date(record.createdAt).toLocaleString()}
+              {formatDateTime(record.createdAt)}
             </p>
-            <dl className="my-2 text-sm">
-              {Object.entries(record.data)
-                .filter(([key]) => !["kind", "attachmentIds"].includes(key))
-                .map(([key, value]) => (
-                  <div key={key}>
-                    <dt className="inline font-semibold">{key}: </dt>
-                    <dd className="inline whitespace-pre-wrap">
-                      {String(value)}
-                    </dd>
-                  </div>
-                ))}
+            <dl className="my-2 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[max-content_1fr]">
+              {recordRows(record.data).map(({ label, value }) => (
+                <div key={label} className="contents">
+                  <dt className="font-semibold">{label}</dt>
+                  <dd className="whitespace-pre-wrap break-words">{value}</dd>
+                </div>
+              ))}
             </dl>
             {Array.isArray(record.data.attachmentIds) &&
               record.data.attachmentIds.map((id) => (

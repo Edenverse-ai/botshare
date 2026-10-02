@@ -1,6 +1,8 @@
 "use client";
 import { FormEvent } from "react";
 import { RobotPanelProps, field, button } from "./types";
+import { prepareUpload } from "./prepareUpload";
+import { FILE_KIND_LABELS } from "./labels";
 
 export default function IdentityPanel({
   robot,
@@ -15,33 +17,17 @@ export default function IdentityPanel({
     const file = form.get("file");
     if (!(file instanceof File) || !file.size) return;
     await run(async () => {
-      if (file.size > 5 * 1024 * 1024)
-        throw new Error("Choose a file up to 5 MB.");
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result).split(",")[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const prepared = await prepareUpload(file);
       await call(`robots/${robot.id}/files`, "POST", {
-        name: file.name,
-        mime: file.type,
+        ...prepared,
         kind: form.get("kind"),
-        base64,
       });
       await reload();
     });
   }
   return (
-    <section className="space-y-4 rounded-xl border p-4">
-      <h2 className="text-xl font-semibold">Identity & evidence</h2>
-      <p>
-        {robot.publicId || "Permanent ID not issued"} ·{" "}
-        {robot.lifecycle === "RETIRED"
-          ? "Retired · Last recorded condition: "
-          : `${robot.lifecycle} · `}
-        {robot.condition.replaceAll("_", " ")}
-      </p>
+    <section id="evidence" className="space-y-4 rounded-xl border p-4">
+      <h2 className="text-xl font-semibold">Photos, registration & inspection</h2>
       <form onSubmit={upload} className="grid gap-3 sm:grid-cols-2">
         <label>
           Image purpose
@@ -52,12 +38,12 @@ export default function IdentityPanel({
           </select>
         </label>
         <label>
-          File (up to 5 MB)
+          Photo or PDF (phone photos are resized automatically)
           <input
             className={field}
             name="file"
             type="file"
-            accept="image/png,image/jpeg,image/webp,application/pdf"
+            accept="image/*,application/pdf"
             required
           />
         </label>
@@ -76,7 +62,7 @@ export default function IdentityPanel({
             >
               {f.name}
             </a>{" "}
-            · {f.kind.toLowerCase()}
+            · {FILE_KIND_LABELS[f.kind] ?? f.kind}
           </li>
         ))}
       </ul>

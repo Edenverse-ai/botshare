@@ -1,11 +1,25 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import {
+  FormEvent,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import IdentityPanel from "./IdentityPanel";
 import RobotLabel from "./RobotLabel";
 import RecordPanel from "./RecordPanel";
+import HistoryPanel from "./HistoryPanel";
+import { CONDITION_LABELS, LIFECYCLE_LABELS, identityFields } from "./labels";
 import { Robot, field, button } from "./types";
 
 type Model = { id: string; brand: string; model: string };
+function numberOrNull(value: FormDataEntryValue | null) {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text ? Number(text) : null;
+}
+
 export default function RegistryDashboard({
   environment,
 }: {
@@ -17,6 +31,8 @@ export default function RegistryDashboard({
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<"list" | "robot">("list");
+  const [editing, setEditing] = useState(false);
   const pendingKeys = useRef(new Map<string, string>());
   const call = useCallback(
     async (path: string, method = "GET", body?: unknown) => {
@@ -57,7 +73,10 @@ export default function RegistryDashboard({
       call(`robots?search=${encodeURIComponent(publicId)}`)
         .then(async (matches: Robot[]) => {
           const robot = matches.find((r) => r.publicId === publicId);
-          if (robot) setSelected(await call(`robots/${robot.id}`));
+          if (robot) {
+            setSelected(await call(`robots/${robot.id}`));
+            setView("robot");
+          }
         })
         .catch((e) => setError(e.message));
   }, [call]);
@@ -73,6 +92,24 @@ export default function RegistryDashboard({
       setBusy(false);
     }
   }
+  function openNew() {
+    setSelected(null);
+    setEditing(true);
+    setView("robot");
+  }
+  function openRobot(id: string) {
+    act(async () => {
+      setSelected(await call(`robots/${id}`));
+      setEditing(false);
+      setView("robot");
+      window.scrollTo({ top: 0 });
+    });
+  }
+  function backToList() {
+    setSelected(null);
+    setEditing(false);
+    setView("list");
+  }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -85,6 +122,11 @@ export default function RegistryDashboard({
         notes: form.get("notes"),
         insurance: form.get("insurance"),
         tracker: form.get("tracker"),
+        replacementValue: numberOrNull(form.get("replacementValue")),
+        currency: form.get("currency"),
+        operatingHours: numberOrNull(form.get("operatingHours")),
+        firmwareVersion: form.get("firmwareVersion"),
+        oemDeviceId: form.get("oemDeviceId"),
         ...(selected
           ? {
               nameplateId: form.get("nameplateId") || null,
@@ -102,8 +144,22 @@ export default function RegistryDashboard({
         : await call("robots", "POST", data);
       setSelected(robot);
       setSelected(await call(`robots/${robot.id}`));
+      setEditing(false);
     });
   }
+  const sections = selected
+    ? [
+        ["details", "Details"],
+        ["evidence", "Photos & registration"],
+        ...(selected.publicId
+          ? [
+              ["label", "QR label"],
+              ["records", "Records"],
+            ]
+          : []),
+        ["history", "History"],
+      ]
+    : [];
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
       <header>
@@ -111,7 +167,9 @@ export default function RegistryDashboard({
           Hifivebot · Infrastructure
         </p>
         <h1 className="text-3xl font-bold">Robot registry</h1>
-        <p>Independent physical robot passports.</p>
+        <p className="text-neutral-600">
+          Independent physical robot passports.
+        </p>
         {environment !== "production" && (
           <p className="mt-3 rounded border border-black bg-neutral-100 p-3">
             {environment.toUpperCase()} — Test records and labels are not
@@ -124,171 +182,350 @@ export default function RegistryDashboard({
           {error}
         </p>
       )}
-      <div className="grid gap-6 md:grid-cols-[280px_1fr]">
-        <aside className="space-y-3">
-          <button
-            className={button}
-            disabled={busy}
-            onClick={() => setSelected(null)}
-          >
-            New draft
-          </button>
-          <label className="block">
-            Search Robot ID or serial
-            <input
-              className={field}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </label>
-          {robots.map((r) => (
-            <button
-              disabled={busy}
-              className="block w-full rounded border p-3 text-left hover:bg-neutral-100"
-              key={r.id}
-              onClick={() =>
-                act(async () => setSelected(await call(`robots/${r.id}`)))
-              }
-            >
-              {r.publicId || r.serialNumber || "Incomplete draft"}
-              <span className="block text-sm text-neutral-500">
-                {r.ownerName} · {r.location || "Location not supplied"}
-              </span>
+
+      {view === "list" ? (
+        <section aria-label="Robots" className="space-y-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <label className="block w-full sm:max-w-sm">
+              Search Robot ID or serial
+              <input
+                className={field}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
+            <button className={button} disabled={busy} onClick={openNew}>
+              New draft
             </button>
-          ))}
-        </aside>
+          </div>
+          {robots.length === 0 ? (
+            <p className="rounded-xl border border-dashed p-8 text-center text-neutral-500">
+              {search
+                ? "No robot matches that ID or serial."
+                : "No robots yet. Choose New draft to add the first one."}
+            </p>
+          ) : (
+            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {robots.map((r) => (
+                <li key={r.id}>
+                  <button
+                    disabled={busy}
+                    onClick={() => openRobot(r.id)}
+                    className="flex h-full w-full flex-col gap-3 rounded-xl border border-neutral-300 bg-white p-4 text-left transition hover:border-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black disabled:opacity-60"
+                  >
+                    <span className="flex flex-wrap gap-2">
+                      <Chip strong={r.lifecycle === "REGISTERED"}>
+                        {LIFECYCLE_LABELS[r.lifecycle] ?? r.lifecycle}
+                      </Chip>
+                      {r.lifecycle === "REGISTERED" && (
+                        <Chip>
+                          {CONDITION_LABELS[r.condition] ?? r.condition}
+                        </Chip>
+                      )}
+                    </span>
+                    <span className="font-mono text-2xl font-bold tracking-tight">
+                      {r.publicId ?? "Draft"}
+                    </span>
+                    <span className="font-semibold">
+                      {r.model
+                        ? `${r.model.brand} ${r.model.model}`
+                        : "Model not set"}
+                    </span>
+                    <span className="mt-auto break-words text-sm text-neutral-500">
+                      {r.serialNumber
+                        ? `S/N ${r.serialNumber}`
+                        : "No serial number yet"}
+                      {r.location ? ` · ${r.location}` : ""}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : (
         <section className="space-y-5">
-          <h2 className="text-xl font-semibold">
-            {selected ? "Internal passport" : "New robot draft"}
-          </h2>
-          <form
-            key={selected ? `${selected.id}:${selected.version}` : "new"}
-            onSubmit={save}
-            className="grid gap-4 sm:grid-cols-2"
+          <button
+            className="text-sm font-semibold underline underline-offset-4"
+            onClick={backToList}
+            disabled={busy}
           >
-            <label>
-              Robot model
-              <select
-                name="modelId"
-                className={field}
-                defaultValue={selected?.modelId || ""}
-              >
-                <option value="">Not supplied</option>
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.brand} {m.model}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Manufacturer serial number
-              <input
-                name="serialNumber"
-                className={field}
-                defaultValue={selected?.serialNumber || ""}
-                maxLength={100}
-              />
-            </label>
-            <label>
-              Owner
-              <input
-                name="ownerName"
-                className={field}
-                defaultValue={selected?.ownerName || "Hifivebot"}
-                required
-              />
-            </label>
-            <label>
-              Private location
-              <input
-                name="location"
-                className={field}
-                defaultValue={selected?.location || ""}
-              />
-            </label>
-            <label className="sm:col-span-2">
-              Notes
-              <textarea
-                name="notes"
-                className={field}
-                defaultValue={selected?.notes || ""}
-              />
-            </label>
-            <label>
-              Insurance (optional)
-              <input
-                name="insurance"
-                className={field}
-                defaultValue={selected?.insurance || ""}
-              />
-            </label>
-            <label>
-              Tracker (optional)
-              <input
-                name="tracker"
-                className={field}
-                defaultValue={selected?.tracker || ""}
-              />
-            </label>
+            ← All robots
+          </button>
+          <div className="space-y-3 rounded-xl border border-black p-5">
+            <div className="flex flex-wrap gap-2">
+              {selected ? (
+                <>
+                  <Chip strong={selected.lifecycle === "REGISTERED"}>
+                    {LIFECYCLE_LABELS[selected.lifecycle] ?? selected.lifecycle}
+                  </Chip>
+                  {selected.lifecycle === "REGISTERED" && (
+                    <Chip>
+                      {CONDITION_LABELS[selected.condition] ??
+                        selected.condition}
+                    </Chip>
+                  )}
+                </>
+              ) : (
+                <Chip>New</Chip>
+              )}
+            </div>
+            <h2 className="break-words font-mono text-3xl font-bold tracking-tight">
+              {selected ? (selected.publicId ?? "Draft") : "New robot draft"}
+            </h2>
             {selected && (
+              <p className="text-neutral-600">
+                {selected.model
+                  ? `${selected.model.brand} ${selected.model.model}`
+                  : "Model not set"}
+                {selected.serialNumber ? ` · S/N ${selected.serialNumber}` : ""}
+              </p>
+            )}
+            {sections.length > 0 && (
+              <nav aria-label="Sections" className="flex flex-wrap gap-2 pt-1">
+                {sections.map(([id, label]) => (
+                  <a
+                    key={id}
+                    href={`#${id}`}
+                    className="rounded-full border px-3 py-1 text-sm hover:border-black"
+                  >
+                    {label}
+                  </a>
+                ))}
+              </nav>
+            )}
+          </div>
+
+          <section id="details" className="space-y-4 rounded-xl border p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-semibold">Details</h2>
+              {selected && !editing && (
+                <button
+                  className={button}
+                  disabled={busy}
+                  onClick={() => setEditing(true)}
+                >
+                  Edit details
+                </button>
+              )}
+            </div>
+            {selected && !editing ? (
+              <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                {identityFields(selected, models, selected.files)
+                  .filter(({ key }) => key !== "currency")
+                  .map(({ key, label, show }) => (
+                    <div
+                      key={key}
+                      className={key === "notes" ? "sm:col-span-2" : undefined}
+                    >
+                      <dt className="text-sm text-neutral-500">{label}</dt>
+                      <dd className="whitespace-pre-wrap break-words">
+                        {show(selected[key as keyof Robot] as never)}
+                      </dd>
+                    </div>
+                  ))}
+              </dl>
+            ) : (
               <>
-                <label>
-                  Private nameplate
-                  <select
-                    className={field}
-                    name="nameplateId"
-                    defaultValue={selected.nameplateId || ""}
-                  >
-                    <option value="">Not selected</option>
-                    {selected.files
-                      ?.filter((f) => f.kind === "NAMEPLATE")
-                      .map((f) => (
-                        <option value={f.id} key={f.id}>
-                          {f.name}
+                <form
+                  key={selected ? `${selected.id}:${selected.version}` : "new"}
+                  onSubmit={save}
+                  className="grid gap-4 sm:grid-cols-2"
+                >
+                  <label>
+                    Robot model
+                    <select
+                      name="modelId"
+                      className={field}
+                      defaultValue={selected?.modelId || ""}
+                    >
+                      <option value="">Not supplied</option>
+                      {models.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.brand} {m.model}
                         </option>
                       ))}
-                  </select>
-                </label>
-                <label>
-                  Public presentation photo
-                  <select
-                    className={field}
-                    name="presentationId"
-                    defaultValue={selected.presentationId || ""}
+                    </select>
+                  </label>
+                  <label>
+                    Manufacturer serial number
+                    <input
+                      name="serialNumber"
+                      className={field}
+                      defaultValue={selected?.serialNumber || ""}
+                      maxLength={100}
+                    />
+                  </label>
+                  <label>
+                    Owner
+                    <input
+                      name="ownerName"
+                      className={field}
+                      defaultValue={selected?.ownerName || "Hifivebot"}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Private location
+                    <input
+                      name="location"
+                      className={field}
+                      defaultValue={selected?.location || ""}
+                    />
+                  </label>
+                  <label className="sm:col-span-2">
+                    Notes
+                    <textarea
+                      name="notes"
+                      className={field}
+                      defaultValue={selected?.notes || ""}
+                    />
+                  </label>
+                  <label>
+                    Insurance (optional)
+                    <input
+                      name="insurance"
+                      className={field}
+                      defaultValue={selected?.insurance || ""}
+                    />
+                  </label>
+                  <label>
+                    Tracker (optional)
+                    <input
+                      name="tracker"
+                      className={field}
+                      defaultValue={selected?.tracker || ""}
+                    />
+                  </label>
+                  <fieldset className="grid gap-4 border-t pt-4 sm:col-span-2 sm:grid-cols-2">
+                    <legend className="pr-2 text-sm font-semibold uppercase tracking-widest text-neutral-500">
+                      Asset details (optional)
+                    </legend>
+                    <label>
+                      Replacement value
+                      <div className="flex gap-2">
+                        <input
+                          name="replacementValue"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputMode="decimal"
+                          className={field}
+                          defaultValue={selected?.replacementValue ?? ""}
+                        />
+                        <input
+                          name="currency"
+                          aria-label="Currency"
+                          className={`${field} w-24 uppercase`}
+                          defaultValue={selected?.currency || "USD"}
+                          maxLength={3}
+                          required
+                        />
+                      </div>
+                    </label>
+                    <label>
+                      Operating hours
+                      <input
+                        name="operatingHours"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        inputMode="decimal"
+                        className={field}
+                        defaultValue={selected?.operatingHours ?? ""}
+                      />
+                    </label>
+                    <label>
+                      Firmware version
+                      <input
+                        name="firmwareVersion"
+                        className={field}
+                        defaultValue={selected?.firmwareVersion || ""}
+                        maxLength={100}
+                      />
+                    </label>
+                    <label>
+                      OEM device ID
+                      <input
+                        name="oemDeviceId"
+                        className={field}
+                        defaultValue={selected?.oemDeviceId || ""}
+                        maxLength={100}
+                      />
+                    </label>
+                  </fieldset>
+                  {selected && (
+                    <>
+                      <label>
+                        Private nameplate
+                        <select
+                          className={field}
+                          name="nameplateId"
+                          defaultValue={selected.nameplateId || ""}
+                        >
+                          <option value="">Not selected</option>
+                          {selected.files
+                            ?.filter((f) => f.kind === "NAMEPLATE")
+                            .map((f) => (
+                              <option value={f.id} key={f.id}>
+                                {f.name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      <label>
+                        Public presentation photo
+                        <select
+                          className={field}
+                          name="presentationId"
+                          defaultValue={selected.presentationId || ""}
+                        >
+                          <option value="">No public photo</option>
+                          {selected.files
+                            ?.filter((f) => f.kind === "PRESENTATION")
+                            .map((f) => (
+                              <option value={f.id} key={f.id}>
+                                {f.name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    </>
+                  )}
+                  {selected && (
+                    <label className="sm:col-span-2">
+                      Reason for change
+                      <input name="reason" className={field} required />
+                    </label>
+                  )}
+                  {selected?.publicId && (
+                    <label className="sm:col-span-2">
+                      <input name="ownerConfirmed" type="checkbox" /> I confirm
+                      the corrected owner (required when changing owner
+                      information).
+                    </label>
+                  )}
+                  <button className={button} disabled={busy}>
+                    {busy
+                      ? "Saving…"
+                      : selected?.publicId
+                        ? "Save identity changes"
+                        : "Save draft"}
+                  </button>
+                </form>
+                {selected && (
+                  <button
+                    className="text-sm underline"
+                    disabled={busy}
+                    onClick={() => setEditing(false)}
                   >
-                    <option value="">No public photo</option>
-                    {selected.files
-                      ?.filter((f) => f.kind === "PRESENTATION")
-                      .map((f) => (
-                        <option value={f.id} key={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
+                    Cancel editing
+                  </button>
+                )}
               </>
             )}
-            {selected && (
-              <label className="sm:col-span-2">
-                Reason for change
-                <input name="reason" className={field} required />
-              </label>
-            )}
-            {selected?.publicId && (
-              <label className="sm:col-span-2">
-                <input name="ownerConfirmed" type="checkbox" /> I confirm the
-                corrected owner (required when changing owner information).
-              </label>
-            )}
-            <button className={button} disabled={busy}>
-              {busy
-                ? "Saving…"
-                : selected?.publicId
-                  ? "Save identity changes"
-                  : "Save draft"}
-            </button>
-          </form>
+          </section>
+
           {selected && (
             <IdentityPanel
               key={`identity-panel-${selected.id}:${selected.version}`}
@@ -326,24 +563,29 @@ export default function RegistryDashboard({
               }
             />
           )}
-          {selected?.audit && (
-            <div>
-              <h2 className="text-xl font-semibold">History</h2>
-              {selected.audit.map((a) => (
-                <details className="my-2 rounded border p-3" key={a.id}>
-                  <summary>
-                    {a.kind} · {new Date(a.createdAt).toLocaleString()} ·{" "}
-                    {a.actorEmail}
-                  </summary>
-                  <pre className="overflow-auto whitespace-pre-wrap text-xs">
-                    {JSON.stringify(a.data, null, 2)}
-                  </pre>
-                </details>
-              ))}
-            </div>
-          )}
+          {selected && <HistoryPanel robot={selected} models={models} />}
         </section>
-      </div>
+      )}
     </main>
+  );
+}
+
+function Chip({
+  children,
+  strong = false,
+}: {
+  children: ReactNode;
+  strong?: boolean;
+}) {
+  return (
+    <span
+      className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${
+        strong
+          ? "border-black bg-black text-white"
+          : "border-neutral-300 text-neutral-700"
+      }`}
+    >
+      {children}
+    </span>
   );
 }
