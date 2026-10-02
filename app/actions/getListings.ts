@@ -15,6 +15,8 @@ export interface IListingsParams {
   zipCode?: string;
   category?: string;
   robotModel?: string;
+  /** Restricts results to services built on these robot models (robot tag pages). */
+  robotModelIds?: string[];
 }
 
 export default async function getListings(params: IListingsParams) {
@@ -29,6 +31,7 @@ export default async function getListings(params: IListingsParams) {
       startDate,
       endDate,
       category,
+      robotModelIds,
     } = params;
 
     let query: any = {};
@@ -51,6 +54,14 @@ export default async function getListings(params: IListingsParams) {
 
     if (category) {
       query.AND = [...(query.AND ?? []), { category }];
+    }
+
+    if (robotModelIds) {
+      if (robotModelIds.length === 0) return [];
+      query.AND = [
+        ...(query.AND ?? []),
+        { robotModelId: { in: robotModelIds } },
+      ];
     }
 
     if (roomCount) {

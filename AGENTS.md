@@ -25,7 +25,7 @@ npm run db:migrate:verify
 - `app/trips/`, `app/reservations/`, `app/favorites/`, `app/my-listings/`: authenticated pages protected by `middleware.ts`.
 - `components/modals/`: modal dialogs (Login, Register, RentModal, Search).
 - `components/navbar/`: navbar, search, user menu.
-- `components/services/`: scenario index, scenario hero/detail, category chips, results grid.
+- `components/services/`: robot type index/cards/chips (tags from `lib/robotTags.ts`), scenario hero/detail, category chips, results grid.
 - `components/listing/`: service card/detail UI.
 - `lib/`: shared utilities including `adminAuth.ts`, `serviceCategories.ts`, `writeGuard.ts`, `prismadb.ts`.
 - Database: Supabase Postgres via Prisma (`prisma/schema.prisma`).

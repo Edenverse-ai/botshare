@@ -125,12 +125,21 @@ Source of truth: `lib/serviceCategories.ts` (labels, slugs, icons).
 Editorial content per scenario (hero art, overview, modules, flow, gallery) lives in
 `lib/serviceScenarios.ts`.
 
-Routes: `/services` is the scenario index; `/services/<slug>` is a scenario page with
-its bookable packages. `/services?category=<label>&zipCode=…` still renders the filtered
-catalog. `Listing.category` stores the **label**, never the slug.
+Routes: `/services/<slug>` is a scenario page with its bookable packages.
+`/services?category=<label>&zipCode=…` still renders the filtered catalog.
+`Listing.category` stores the **label**, never the slug.
 
-`RobotModel.useCase` (`lib/useCases.ts`) is a separate internal robot-capability
-vocabulary — it is not a service category and must never surface as one.
+## Robot Types (Customer-Facing Browse Taxonomy, 2026-10-01)
+
+The user chose to browse by robot tag instead of by scenario. The home page
+"Robot Types" section and the `/services` index (the hero's "Explore Services")
+show the `RobotModel.useCase` tags (`lib/useCases.ts` picker vocabulary, e.g.
+Guide, Performance, Patrol, Cleaning) carried by **listable** models, read live
+from the database by `lib/robotTags.ts`. Each tag links to `/services/tags/<tag-slug>`
+(its models plus services built on them, matched by `Listing.robotModelId`).
+Tagging a model and marking it listable is all it takes for a tag to appear; do
+not hard-code tags. The eight scenarios remain the value of `Listing.category`
+and keep their `/services/<slug>` pages; they are no longer the browse entry point.
 
 ## Access Control
 

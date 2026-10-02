@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import Container from "@/components/Container";
 import ListingCard from "@/components/listing/ListingCard";
@@ -14,6 +15,9 @@ type Props = {
   activeSlug?: string;
   emptyTitle?: string;
   emptySubtitle?: string;
+  /** Replaces the scenario chips, e.g. with robot type chips. */
+  chips?: ReactNode;
+  browseAllLabel?: string;
 };
 
 function ServiceResults({
@@ -24,6 +28,8 @@ function ServiceResults({
   activeSlug,
   emptyTitle = "No service packages match yet",
   emptySubtitle = "Try another scenario, or widen the coverage area and dates in search.",
+  chips,
+  browseAllLabel = "Browse all scenarios",
 }: Props) {
   return (
     <section className="w-full bg-white py-14 sm:py-16">
@@ -38,7 +44,7 @@ function ServiceResults({
         </div>
 
         <div className="mt-8">
-          <CategoryChips activeSlug={activeSlug} />
+          {chips ?? <CategoryChips activeSlug={activeSlug} />}
         </div>
 
         {listings.length === 0 ? (
@@ -51,7 +57,7 @@ function ServiceResults({
               href="/services"
               className="mt-2 inline-flex rounded-full border border-neutral-900 px-6 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-900 hover:text-white"
             >
-              Browse all scenarios
+              {browseAllLabel}
             </Link>
           </div>
         ) : (

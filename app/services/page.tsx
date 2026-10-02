@@ -1,8 +1,9 @@
 import ClientOnly from "@/components/ClientOnly";
-import ScenarioIndex from "@/components/services/ScenarioIndex";
+import RobotTagIndex from "@/components/services/RobotTagIndex";
 import ServiceResults from "@/components/services/ServiceResults";
 import { matchesRobotModel } from "@/lib/robotModel";
 import { categorySlug } from "@/lib/serviceCategories";
+import { getRobotTags } from "@/lib/robotTags";
 import getCurrentUser from "../actions/getCurrentUser";
 import getListings, { IListingsParams } from "../actions/getListings";
 
@@ -12,7 +13,8 @@ interface ServicesProps {
   searchParams: IListingsParams;
 }
 
-// `/services` is the scenario index. Search and category filters keep the
+// `/services` is the robot type index, built from the tags on listable robot
+// models. Search and category filters keep the
 // existing query-string shape and render the catalog results instead.
 const FILTER_KEYS = [
   "category",
@@ -31,7 +33,7 @@ function hasFilters(searchParams: IListingsParams) {
 
 export default async function ServicesPage({ searchParams }: ServicesProps) {
   if (!hasFilters(searchParams)) {
-    return <ScenarioIndex />;
+    return <RobotTagIndex tags={await getRobotTags()} />;
   }
 
   const { robotModel, ...filters } = searchParams;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { barlow } from "@/lib/fonts";
@@ -12,40 +13,22 @@ interface WaveConfig {
   layers: number;
 }
 
-const SERVICES = [
-  {
-    key: "stage",
-    overline: "LIVE ENTERTAINMENT",
-    title: "Stage Performance",
-    subtitle: "Large & Small Venue",
-    description:
-      "Deploy Hifivebot performers alongside live acts — from intimate stages to arena-scale productions.",
-    href: "/services/entertainment",
-    videoSrc: "https://res.cloudinary.com/dmrhtzqyx/video/upload/q_auto,f_auto/agibot-stage-performance.mp4",
-    waveConfig: { frequency: 0.006, amplitude: 70, speed: 0.017, layers: 3 },
-  },
-  {
-    key: "exhibitions",
-    overline: "BRAND ACTIVATION",
-    title: "Exhibitions",
-    subtitle: "Corporate Events",
-    description:
-      "Captivate attendees at trade shows, product launches, and corporate showcases with live robot demos.",
-    href: "/services/commercial-events",
-    videoSrc: "https://res.cloudinary.com/dmrhtzqyx/video/upload/q_auto,f_auto/exhibition-bg.mp4",
-    waveConfig: { frequency: 0.018, amplitude: 55, speed: 0.022, layers: 3 },
-  },
-  {
-    key: "party",
-    overline: "PRIVATE CELEBRATIONS",
-    title: "Party Events",
-    subtitle: "Birthday, Christmas",
-    description:
-      "Make any celebration unforgettable — robot waiters, interactive entertainment, and crowd-pleasing moments.",
-    href: "/services/private-events",
-    videoSrc: "https://res.cloudinary.com/dmrhtzqyx/video/upload/q_auto,f_auto/party-bg.mp4",
-    waveConfig: { frequency: 0.012, amplitude: 38, speed: 0.013, layers: 3 },
-  },
+export type ShowcaseSlide = {
+  key: string;
+  overline: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  href: string;
+  videoSrc?: string;
+  /** Product shots shown beside the copy when the slide has no video. */
+  images: { src: string; alt: string }[];
+};
+
+const WAVE_CONFIGS: WaveConfig[] = [
+  { frequency: 0.006, amplitude: 70, speed: 0.017, layers: 3 },
+  { frequency: 0.018, amplitude: 55, speed: 0.022, layers: 3 },
+  { frequency: 0.012, amplitude: 38, speed: 0.013, layers: 3 },
 ];
 
 function WaveformCanvas({ config }: { config: WaveConfig }) {
@@ -145,16 +128,16 @@ const itemVariants = {
   },
 };
 
-export default function ServiceShowcase() {
+export default function ServiceShowcase({ slides }: { slides: ShowcaseSlide[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
-  const prev = () => setCurrentIndex((i) => (i - 1 + SERVICES.length) % SERVICES.length);
-  const next = () => setCurrentIndex((i) => (i + 1) % SERVICES.length);
+  const prev = () => setCurrentIndex((i) => (i - 1 + slides.length) % slides.length);
+  const next = () => setCurrentIndex((i) => (i + 1) % slides.length);
 
   // Play active video, pause others
   useEffect(() => {
-    SERVICES.forEach((svc, i) => {
+    slides.forEach((svc, i) => {
       if (!svc.videoSrc) return;
       const video = videoRefs.current[i];
       if (!video) return;
@@ -164,19 +147,19 @@ export default function ServiceShowcase() {
         video.pause();
       }
     });
-  }, [currentIndex]);
+  }, [currentIndex, slides]);
 
   return (
     <div className="relative bg-black" style={{ minHeight: "80vh" }}>
       {/* Section label — always visible at top */}
       <div className="absolute top-8 left-0 right-0 z-20 mx-auto w-full max-w-6xl px-16 sm:px-24 lg:px-28">
         <p className={`${barlow.className} text-3xl font-extrabold uppercase tracking-wide text-white sm:text-4xl`}>
-          Popular Scenarios
+          Robot Types
         </p>
       </div>
 
       {/* Panels — all mounted, crossfade via opacity */}
-      {SERVICES.map((service, i) => (
+      {slides.map((service, i) => (
         <motion.div
           key={service.key}
           animate={{ opacity: i === currentIndex ? 1 : 0 }}
@@ -197,17 +180,17 @@ export default function ServiceShowcase() {
               <source src={service.videoSrc} type="video/mp4" />
             </video>
           ) : (
-            <WaveformCanvas config={service.waveConfig} />
+            <WaveformCanvas config={WAVE_CONFIGS[i % WAVE_CONFIGS.length]} />
           )}
           <div className="absolute inset-0 bg-black/70" />
 
           {/* Content */}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-16 py-20 sm:px-24 lg:px-28">
+          <div className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between gap-12 px-16 py-20 sm:px-24 lg:px-28">
             <motion.div
               variants={contentVariants}
               initial="hidden"
               animate={i === currentIndex ? "visible" : "hidden"}
-              className="flex max-w-xl flex-col gap-6"
+              className="flex min-w-0 max-w-xl flex-1 flex-col gap-6"
             >
               <motion.p
                 variants={itemVariants}
@@ -246,6 +229,31 @@ export default function ServiceShowcase() {
                 </Link>
               </motion.div>
             </motion.div>
+
+            {!service.videoSrc && service.images.length > 0 && (
+              <div className="hidden shrink-0 items-start gap-4 lg:flex">
+                {service.images.map((image, imageIndex) => (
+                  <figure
+                    key={image.src}
+                    className={`${imageIndex > 1 ? "hidden xl:flex" : "flex"} w-36 flex-col gap-3 xl:w-40`}
+                  >
+                    {/* White tiles even out catalog shots that ship with and without a background. */}
+                    <div className="relative h-48 w-full overflow-hidden rounded-2xl bg-white xl:h-52">
+                      <Image
+                        src={image.src}
+                        alt={image.alt}
+                        fill
+                        sizes="192px"
+                        className="object-contain p-4"
+                      />
+                    </div>
+                    <figcaption className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      {image.alt}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
           </div>
         </motion.div>
       ))}
@@ -256,7 +264,7 @@ export default function ServiceShowcase() {
       {/* Left arrow */}
       <button
         onClick={prev}
-        aria-label="Previous service"
+        aria-label="Previous robot type"
         className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 z-20 text-white/50 hover:text-white transition-colors duration-200"
       >
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -267,7 +275,7 @@ export default function ServiceShowcase() {
       {/* Right arrow */}
       <button
         onClick={next}
-        aria-label="Next service"
+        aria-label="Next robot type"
         className="absolute right-4 sm:right-6 top-1/2 -translate-y-1/2 z-20 text-white/50 hover:text-white transition-colors duration-200"
       >
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -277,7 +285,7 @@ export default function ServiceShowcase() {
 
       {/* Dot indicators */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
-        {SERVICES.map((_, i) => (
+        {slides.map((_, i) => (
           <button
             key={i}
             onClick={() => setCurrentIndex(i)}
