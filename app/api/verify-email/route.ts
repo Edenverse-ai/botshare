@@ -1,14 +1,24 @@
 import { getWritesBlockedResponse } from "@/lib/writeGuard";
 import { confirmVerificationCode } from "@/lib/emailVerification";
+import { normalizeEmail } from "@/lib/emailAddress";
+import { AUTH_RATE_LIMITS, clientIp } from "@/lib/rateLimit";
+import { getRateLimitResponse } from "@/lib/rateLimitResponse";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   const writesBlocked = getWritesBlockedResponse();
   if (writesBlocked) return writesBlocked;
 
-  const { email, code } = await request.json();
+  const limited = getRateLimitResponse([
+    { key: `verify-email:${clientIp(request.headers)}`, rule: AUTH_RATE_LIMITS.verifyEmail },
+  ]);
+  if (limited) return limited;
 
-  if (typeof email !== "string" || typeof code !== "string" || code.length !== 6) {
+  const body = await request.json().catch(() => null);
+  const email = normalizeEmail(body?.email);
+  const code = typeof body?.code === "string" ? body.code : "";
+
+  if (!email || code.length !== 6) {
     return NextResponse.json({ error: "Enter the 6-digit code." }, { status: 400 });
   }
 

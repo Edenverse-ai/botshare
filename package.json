@@ -14,6 +14,7 @@
     "registry:prepare": "node scripts/registry-dev.mjs --prepare-only",
     "test:registry": "node scripts/registry-test.mjs",
     "test:registry:browser": "playwright test --config playwright.registry.config.ts",
+    "test:auth:browser": "playwright test --config playwright.auth.config.ts",
     "supabase": "npx -y supabase@latest",
     "db:migrate:sql": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/20260224103000_init_supabase_postgres/migration.sql",
     "db:migrate:data": "node scripts/migrate-mongo-to-postgres.js",

@@ -9,6 +9,9 @@ import { useCallback, useState } from "react";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 
+import { TOO_MANY_ATTEMPTS_ERROR, TOO_MANY_REQUESTS_MESSAGE } from "@/lib/authMessages";
+import { isValidEmailAddress, EMAIL_RULE_MESSAGE } from "@/lib/emailFormat";
+
 import Button from "../Button";
 import AuthModal from "../auth/AuthModal";
 import FloatingInput from "../inputs/FloatingInput";
@@ -43,7 +46,11 @@ function LoginModal() {
         router.refresh();
         handleClose();
       } else if (callback?.error) {
-        toast.error("Invalid email or password.");
+        toast.error(
+          callback.error.includes(TOO_MANY_ATTEMPTS_ERROR)
+            ? TOO_MANY_REQUESTS_MESSAGE
+            : "Invalid email or password."
+        );
       }
     });
   };
@@ -67,7 +74,19 @@ function LoginModal() {
       <p className="mt-1.5 text-[15px] text-brand-muted">Log in to your Hifivebot account.</p>
 
       <div className="mt-6 flex flex-col gap-3.5">
-        <FloatingInput id="email" label="Email address" type="email" required disabled={isLoading} register={register} errors={errors} />
+        <FloatingInput
+          id="email"
+          label="Email address"
+          type="email"
+          required
+          disabled={isLoading}
+          register={register}
+          errors={errors}
+          registerOptions={{
+            required: "Enter your email address",
+            validate: (v) => isValidEmailAddress(v) || EMAIL_RULE_MESSAGE,
+          }}
+        />
         <FloatingInput id="password" label="Password" type="password" required disabled={isLoading} register={register} errors={errors} />
         <div className="-mt-0.5 text-right">
           <span onClick={toForgot} className="cursor-pointer text-[14px] font-extrabold text-brand underline decoration-brand-subtle underline-offset-[3px]">

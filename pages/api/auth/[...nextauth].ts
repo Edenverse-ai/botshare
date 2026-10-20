@@ -1,4 +1,6 @@
 import prisma from "@/lib/prismadb";
+import { findUserByEmail, normalizeEmail } from "@/lib/emailAddress";
+import { AUTH_RATE_LIMITS, clientIp, consumeRateLimit } from "@/lib/rateLimit";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import NextAuth, { AuthOptions, DefaultSession } from "next-auth";
@@ -29,16 +31,27 @@ export const authOptions: AuthOptions = {
         email: { label: "email", type: "text" },
         password: { label: "password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Invalid credentials");
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email,
-          },
-        });
+        // Throttle per caller, and per caller+address so one attacker cannot
+        // lock a victim out of their own account from elsewhere.
+        const email = normalizeEmail(credentials.email);
+        const ip = clientIp(req?.headers ?? {});
+        const budgets = [
+          { key: `login:ip:${ip}`, rule: AUTH_RATE_LIMITS.loginPerIp },
+          { key: `login:identity:${ip}:${email}`, rule: AUTH_RATE_LIMITS.loginPerIdentity },
+        ];
+        for (const { key, rule } of budgets) {
+          if (!consumeRateLimit(key, rule).allowed) {
+            throw new Error("TooManyAttempts");
+          }
+        }
+
+        // Case-insensitive so a mailbox signs in however it is capitalised.
+        const user = await findUserByEmail(email);
 
         if (!user || !user?.hashedPassword) {
           throw new Error("Invalid credentials");

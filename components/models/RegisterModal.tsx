@@ -18,6 +18,7 @@ import FloatingInput from "../inputs/FloatingInput";
 import CodeInput from "../inputs/CodeInput";
 import PasswordRules from "../auth/PasswordRules";
 import { validatePassword, PASSWORD_RULE_MESSAGE } from "@/lib/passwordPolicy";
+import { isValidEmailAddress, EMAIL_RULE_MESSAGE } from "@/lib/emailFormat";
 
 type UserType = "CUSTOMER" | "PROVIDER";
 type Step = "role" | "form" | "verify" | "success";
@@ -194,7 +195,10 @@ function RegisterModal() {
             {isProvider ? "Start listing your robot services." : "Book robot services in minutes."}
           </p>
           <div className="mt-6 flex flex-col gap-3.5">
-            <FloatingInput id="email" label="Email address" type="email" required disabled={isLoading} register={register} errors={errors} registerOptions={{ required: "Enter your email address" }} />
+            <FloatingInput id="email" label="Email address" type="email" required disabled={isLoading} register={register} errors={errors} registerOptions={{
+                required: "Enter your email address",
+                validate: (v) => isValidEmailAddress(v) || EMAIL_RULE_MESSAGE,
+              }} />
             <FloatingInput id="name" label="Username" required disabled={isLoading} register={register} errors={errors} registerOptions={{ required: "Choose a username" }} />
             <FloatingInput id="password" label="Password" type="password" required disabled={isLoading} register={register} errors={errors} registerOptions={{ required: "Create a password", validate: (v) => validatePassword(v).valid || PASSWORD_RULE_MESSAGE }} />
             {(password?.length ?? 0) > 0 && <PasswordRules password={password} />}

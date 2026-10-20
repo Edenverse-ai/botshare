@@ -14,6 +14,7 @@ import FloatingInput from "../inputs/FloatingInput";
 import CodeInput from "../inputs/CodeInput";
 import PasswordRules from "../auth/PasswordRules";
 import { validatePassword, PASSWORD_RULE_MESSAGE } from "@/lib/passwordPolicy";
+import { isValidEmailAddress, EMAIL_RULE_MESSAGE } from "@/lib/emailFormat";
 
 type Step = "request" | "reset" | "success";
 
@@ -136,7 +137,10 @@ function ForgotPasswordModal() {
               disabled={isLoading}
               register={register}
               errors={errors}
-              registerOptions={{ required: "Enter your email address" }}
+              registerOptions={{
+                required: "Enter your email address",
+                validate: (v) => isValidEmailAddress(v) || EMAIL_RULE_MESSAGE,
+              }}
             />
             <Button label="Send reset code" disabled={isLoading} onClick={handleSubmit(onRequest)} />
             <p className="text-center text-[14px] text-brand-muted">

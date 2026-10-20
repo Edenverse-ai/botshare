@@ -66,5 +66,6 @@ deno.lock
 /.playwright-mcp/
 /smoke-*.png
 /.registry-test-results/
+/.auth-test-results/
 # Robot catalog: extracted images are regenerable, keep out of git
 data/robot-catalog/robot-images/
