@@ -1,0 +1,36 @@
+{
+  "_comment": "Curated final cuts from a607a/x2-video-assets (158 raw files -> 22 shots). Chosen by preferring the latest repair/candidate pass per shot: numbered '今日修复版/第N次修复版 720p技术候选' first, then highest 候选NN, then 720p candidate, then platform original.",
+  "sourceBase": "https://media.githubusercontent.com/media/a607a/x2-video-assets/main/01_所有视频/",
+  "shots": [
+    { "slug": "hotels/front-desk-greeting",        "category": "Hotels",                 "file": "01_酒店_前台空闲柜台引导_今日修复版_720p技术候选.mp4",                           "title": "Front desk greeting",            "caption": "Greets arrivals at an unstaffed counter and points them to check-in." },
+    { "slug": "hotels/elevator-wayfinding",        "category": "Hotels",                 "file": "04_酒店_入住后电梯方向提示_第2次修复版_720p技术候选.mp4",                        "title": "Elevator wayfinding",            "caption": "Walks a guest from check-in toward the right elevator bank." },
+    { "slug": "hotels/family-photo-poses",         "category": "Hotels",                 "file": "候选02_图35_酒店亲子三姿势挑战_单向环绕重做_720p.mp4",                           "title": "Family photo poses",             "caption": "Holds three poses in turn so parents and children can photograph each one." },
+
+    { "slug": "shopping-centers/showroom-handoff", "category": "Shopping Centers",       "file": "06_商场与零售_汽车展厅客户带路交接_第1次修复版_720p技术候选.mp4",                  "title": "Showroom handoff",               "caption": "Leads a walk-in across the floor and hands them to a sales associate." },
+    { "slug": "shopping-centers/concierge-directions", "category": "Shopping Centers",   "file": "候选01_图26_商场服务台方向指引_720p.mp4",                                        "title": "Concierge directions",           "caption": "Answers a direction question at the mall service desk." },
+    { "slug": "shopping-centers/store-opening-queue", "category": "Shopping Centers",    "file": "候选01_图56_门店开幕排队互动与入场交接_720p.mp4",                                 "title": "Opening-day queue",              "caption": "Works the opening-day line, then hands guests off at the door." },
+
+    { "slug": "restaurants/birthday-toast",        "category": "Restaurants",            "file": "候选01_自生成04_餐饮门店_美国生日套餐非接触祝福与合影_视频五十二_720p.mp4",        "title": "Birthday toast",                 "caption": "Delivers a contact-free birthday greeting at the table." },
+    { "slug": "restaurants/birthday-group-photo",  "category": "Restaurants",            "file": "候选02_视频五十四_美国生日套餐合影阶段_720p.mp4",                                 "title": "Table group photo",              "caption": "Sets up the group shot once the greeting is done." },
+    { "slug": "restaurants/reservation-welcome",   "category": "Restaurants",            "file": "餐饮门店_旗舰餐厅预约入场迎宾_第1次平台原片.mp4",                                  "title": "Reservation welcome",            "caption": "Meets a booked party at the entrance of a flagship dining room." },
+
+    { "slug": "schools-universities/robotics-lab-demo", "category": "Schools & Universities", "file": "候选01_自生成02_学校与高校_大学机器人实验室预设动作演示_视频四十四_720p.mp4",  "title": "Robotics lab demo",              "caption": "Runs preset motions for students in a university lab." },
+    { "slug": "schools-universities/open-day-checkin",  "category": "Schools & Universities", "file": "候选02_视频四十五_大学开放日工程楼入口签到与方向提示_720p.mp4",                "title": "Open-day check-in",              "caption": "Handles check-in and directions at the engineering building entrance." },
+
+    { "slug": "commercial-events/awards-stage",    "category": "Commercial Events",      "file": "候选02_视频四十二_颁奖礼获奖者入位合影_720p.mp4",                                 "title": "Awards stage",                   "caption": "Places each winner on their mark for the photo." },
+    { "slug": "commercial-events/badge-routing",   "category": "Commercial Events",      "file": "候选01_图37_商业活动签到分流_720p.mp4",                                          "title": "Badge routing",                  "caption": "Splits an arriving crowd across registration lanes." },
+    { "slug": "commercial-events/entry-queue",     "category": "Commercial Events",      "file": "候选01_图61_场馆入口家庭进入队列指引_视频三十九_720p.mp4",                        "title": "Entry queue",                    "caption": "Keeps the family entry line moving at a venue gate." },
+
+    { "slug": "entertainment/club-dj-set",         "category": "Entertainment",          "file": "候选01_图8_夜店机器人DJ视觉秀_720p.mp4",                                         "title": "Club DJ set",                    "caption": "Fronts the booth as the visual act for a club night." },
+    { "slug": "entertainment/relay-stage-show",    "category": "Entertainment",          "file": "候选02_图9_人机接力舞台秀_动态运镜参考_720p.mp4",                                 "title": "Relay stage show",               "caption": "Trades the stage back and forth with a human dancer." },
+    { "slug": "entertainment/chorus-beat-marks",   "category": "Entertainment",          "file": "候选01_图64_歌手与X2副歌视觉拍点_视频四十一_720p.mp4",                            "title": "Chorus beat marks",              "caption": "Hits the chorus beats beside a live singer." },
+    { "slug": "entertainment/two-robot-crowd-call","category": "Entertainment",          "file": "候选01_图10_双机器人舞台与观众联动_720p.mp4",                                     "title": "Two-robot crowd call",           "caption": "Two robots trade calls with the audience." },
+
+    { "slug": "private-events/pool-party",         "category": "Private Events",         "file": "候选01_图7_私人泳池生日派对_720p.mp4",                                            "title": "Pool party",                     "caption": "Joins a backyard birthday at the poolside." },
+    { "slug": "private-events/wedding-dance-circle","category": "Private Events",        "file": "候选01_图11_婚礼两拍接力舞圈_720p.mp4",                                           "title": "Wedding dance circle",           "caption": "Takes a turn in the reception dance circle." },
+    { "slug": "private-events/dinner-countdown",   "category": "Private Events",         "file": "候选03_视频三十七_私人生日晚宴倒计时与合影提示_720p.mp4",                         "title": "Dinner countdown",               "caption": "Counts down to the cake, then cues the group photo." },
+    { "slug": "private-events/kids-interaction",   "category": "Private Events",         "file": "候选02_视频一_生日儿童互动_全能参考环绕_720p.mp4",                                "title": "Kids interaction",               "caption": "Plays to the children at a birthday party." },
+
+    { "slug": "warehouses/dc-dock-patrol",         "category": "Warehouses",             "file": "仓储与产线_A2W美国配送中心装卸区自主巡逻_第1次平台原片.mp4",                       "title": "Dock patrol",                    "caption": "Runs an autonomous patrol of a distribution-center loading dock." }
+  ]
+}

@@ -7,9 +7,18 @@ import { getRobotTags, robotTagDescription } from "@/lib/robotTags";
 export const dynamic = "force-dynamic";
 
 // Tags with footage play it behind the slide; the rest show product shots.
+//
+// X2 clips are curated cuts from the character-asset library — see
+// `scripts/x2-video-manifest.json` for which raw take each one came from.
+// The Cleaning clip is PUDU's own MT1 product footage, re-hosted from
+// cdn.pudutech.com (confirm redistribution rights before this ships).
+const CLD = "https://res.cloudinary.com/dmrhtzqyx/video/upload/q_auto,f_auto";
+
 const TAG_VIDEOS: Record<string, string> = {
-  Performance:
-    "https://res.cloudinary.com/dmrhtzqyx/video/upload/q_auto,f_auto/agibot-stage-performance.mp4",
+  Performance: `${CLD}/agibot-stage-performance.mp4`,
+  Guide: `${CLD}/scenarios/hotels/front-desk-greeting.mp4`,
+  Patrol: `${CLD}/scenarios/warehouses/dc-dock-patrol.mp4`,
+  Cleaning: `${CLD}/robot-tags/cleaning-pudu-mt1.mp4`,
 };
 
 export default async function Home() {
