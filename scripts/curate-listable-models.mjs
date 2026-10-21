@@ -1,10 +1,13 @@
 /**
  * curate-listable-models.mjs — set prices, use cases, labels, and the `listable`
  * flag for the 13 robots a provider can list. Idempotent (upsert by slug).
+ * Faraday Future's FF / FX models (scripts/ff-models.mjs, written by
+ * add-ff-models.mjs) are re-listed after the reset rather than curated here.
  * Run: node scripts/curate-listable-models.mjs
  */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { FF_MODELS } from "./ff-models.mjs";
 
 const prisma = new PrismaClient();
 
@@ -76,9 +79,14 @@ async function main() {
     console.log(`  ✓ ${slug} (listable)`);
   }
 
+  // 2. Faraday Future's own models keep the listable flag their rate card sets.
+  const ffListable = FF_MODELS.filter((m) => m.at(-1)).map(([slug]) => slug);
+  await prisma.robotModel.updateMany({ where: { slug: { in: ffListable } }, data: { listable: true } });
+
+  const expected = MODELS.length + ffListable.length;
   const count = await prisma.robotModel.count({ where: { listable: true } });
   console.log(`listable RobotModel count = ${count}`);
-  if (count !== 13) throw new Error(`Expected 13 listable models, got ${count}`);
+  if (count !== expected) throw new Error(`Expected ${expected} listable models, got ${count}`);
   await prisma.$disconnect();
 }
 
