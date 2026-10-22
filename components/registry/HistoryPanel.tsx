@@ -5,6 +5,8 @@ import {
   FILE_KIND_LABELS,
   RECORD_KIND_LABELS,
   formatDateTime,
+  formatTier,
+  formatUsd,
   humanize,
   identityFields,
 } from "./labels";
@@ -79,6 +81,22 @@ function describe(
               ? [`Reason: ${d.correctionReason}`]
               : [],
           };
+    }
+    case "MODEL_PRICING_UPDATED": {
+      const before = d.before ?? {};
+      const after = d.after ?? {};
+      const lines: string[] = [];
+      if (before.priceDaily !== after.priceDaily)
+        lines.push(`Daily price: ${formatUsd(before.priceDaily)} → ${formatUsd(after.priceDaily)}`);
+      if (before.priceMonthly !== after.priceMonthly)
+        lines.push(`Monthly price: ${formatUsd(before.priceMonthly)} → ${formatUsd(after.priceMonthly)}`);
+      const tiers = (list: any[] = []) => list.map(formatTier).join("; ") || "none";
+      if (tiers(before.priceTiers) !== tiers(after.priceTiers))
+        lines.push(`Tiers: ${tiers(after.priceTiers)}`);
+      return {
+        title: `${after.brand ?? ""} ${after.model ?? ""} price sheet updated`.trim(),
+        details: lines.length ? lines : ["No price changed"],
+      };
     }
     case "RETIRED":
       return {

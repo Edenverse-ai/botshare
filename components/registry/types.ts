@@ -1,3 +1,14 @@
+import type { PriceTier } from "@/lib/priceTiers";
+
+export type { PriceTier };
+export type RegistryModel = {
+  id: string;
+  brand: string;
+  model: string;
+  priceDaily?: number | null;
+  priceMonthly?: number | null;
+  priceTiers?: PriceTier[];
+};
 export type RobotFile = {
   id: string;
   kind: string;

@@ -144,6 +144,22 @@ Tagging a model and marking it listable is all it takes for a tag to appear; do
 not hard-code tags. The eight scenarios remain the value of `Listing.category`
 and keep their `/services/<slug>` pages; they are no longer the browse entry point.
 
+## Model Pricing and Listing Registered Robots (2026-10-21)
+
+- A robot model's price sheet is shared by every robot of that model and edited
+  by administrators in the Robot Registry (`/admin/robots` → Pricing, panel
+  `components/registry/PricingPanel.tsx`, API `POST /api/registry/models/<id>/pricing`).
+  Everything is optional: `RobotModel.priceDaily` / `priceMonthly` plus
+  `RobotModelPriceTier` rows (`unit` DAY|MONTH, `minQty`..`maxQty` with null =
+  open-ended, `pricing` PER_UNIT = per day/month or TOTAL = whole tier). Tiers in
+  one unit may not overlap. Edits made from a robot's page land in its History.
+- Checkout still charges `priceDaily`; tiers are displayed only (no payment logic).
+- A provider service (`RentModal` provider mode, `POST /api/listings` without
+  `isIndividualOwned`) must be built on a REGISTERED robot (`Listing.robotAssetId`,
+  picker `components/inputs/RegisteredRobotPicker.tsx`, `GET /api/registered-robots`).
+  The model and price come from that robot, never from the client. Any provider
+  may list any registered robot for now. Individual pool listings are unchanged.
+
 ## Access Control
 
 - Service catalog write access is gated to **providers and admins**. Customers must not create/edit/delete services.

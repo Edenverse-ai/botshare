@@ -20,6 +20,8 @@ import CategoryInput from "../inputs/CategoryInput";
 import ImageUpload from "../inputs/ImageUpload";
 import Input from "../inputs/Input";
 import RobotPicker from "../inputs/RobotPicker";
+import RegisteredRobotPicker, { type RegisteredRobot } from "../inputs/RegisteredRobotPicker";
+import { formatTier } from "@/lib/priceTiers";
 import VideoUpload from "../inputs/VideoUpload";
 import Modal from "./Modal";
 import type { RobotModelOption } from "@/hook/useRobotModels";
@@ -46,6 +48,8 @@ function RentModal({ mode = "provider" }: Props) {
   const [step, setStep] = useState(STEPS.ROBOT);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRobot, setSelectedRobot] = useState<RobotModelOption | null>(null);
+  // Provider services are built on a registered robot; its model drives the rest.
+  const [selectedAsset, setSelectedAsset] = useState<RegisteredRobot | null>(null);
 
   const {
     register,
@@ -57,6 +61,7 @@ function RentModal({ mode = "provider" }: Props) {
   } = useForm<FieldValues>({
     defaultValues: {
       robotModelId: null,
+      robotAssetId: null,
       category: "",
       zipCode: "",
       imageSrc: "",
@@ -107,6 +112,12 @@ function RentModal({ mode = "provider" }: Props) {
     }
   };
 
+  const onSelectRegistered = (robot: RegisteredRobot | null) => {
+    setSelectedAsset(robot);
+    setCustomValue("robotAssetId", robot ? robot.id : null);
+    onSelectRobot(robot ? robot.model : null);
+  };
+
   const onBack = () => {
     setStep((value) => value - 1);
   };
@@ -146,6 +157,7 @@ function RentModal({ mode = "provider" }: Props) {
         router.refresh();
         reset();
         setSelectedRobot(null);
+        setSelectedAsset(null);
         setStep(STEPS.ROBOT);
         rentModel.onClose();
       })
@@ -173,13 +185,21 @@ function RentModal({ mode = "provider" }: Props) {
     return "Back";
   }, [step]);
 
-  let bodyContent = (
+  let bodyContent = isIndividual ? (
     <div className="flex flex-col gap-6">
       <Heading
         title="Choose your robot"
         subtitle="Pick a robot from our catalog to start your listing."
       />
       <RobotPicker selectedId={selectedRobot?.id ?? null} onSelect={onSelectRobot} />
+    </div>
+  ) : (
+    <div className="flex flex-col gap-6">
+      <Heading
+        title="Choose a registered robot"
+        subtitle="Only robots registered in the Robot Registry can be listed. Its model sets the price."
+      />
+      <RegisteredRobotPicker selectedId={selectedAsset?.id ?? null} onSelect={onSelectRegistered} />
     </div>
   );
 
@@ -330,7 +350,9 @@ function RentModal({ mode = "provider" }: Props) {
           }
         />
         <div className="rounded-xl border-2 border-neutral-200 p-6 text-center">
-          <p className="text-2xl font-semibold text-black">{tiers.join("  ·  ")}</p>
+          <p className="text-2xl font-semibold text-black">
+            {tiers.length ? tiers.join("  ·  ") : "No price set for this model yet"}
+          </p>
           {isIndividual ? (
             <p className="mt-2 text-sm text-neutral-700 font-medium">
               {individualEarningsCopy()}
@@ -341,6 +363,25 @@ function RentModal({ mode = "provider" }: Props) {
             </p>
           )}
         </div>
+        {!isIndividual && selectedAsset && (
+          <div className="rounded-xl border border-neutral-200 p-4 text-sm">
+            <p className="font-semibold">
+              {selectedAsset.publicId} · {selectedAsset.model.brand} {selectedAsset.model.model}
+            </p>
+            {selectedAsset.model.priceTiers.length > 0 ? (
+              <>
+                <p className="mt-2 text-neutral-500">Tiered prices from the model&apos;s price sheet</p>
+                <ul className="mt-1 space-y-0.5">
+                  {selectedAsset.model.priceTiers.map((t) => (
+                    <li key={`${t.unit}-${t.minQty}`}>{formatTier(t)}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="mt-2 text-neutral-500">No tiered prices set for this model.</p>
+            )}
+          </div>
+        )}
       </div>
     );
   }

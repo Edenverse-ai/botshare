@@ -63,6 +63,53 @@ const updateFields = draftFields.extend({
   reason: text.min(1),
   ownerConfirmed: z.boolean().optional(),
 });
+// Model-level price sheet. Every price is optional; tiers within one unit must
+// not overlap, and an open-ended tier (maxQty null) can only be the last one.
+const price = z.number().int().nonnegative().max(10_000_000).nullable();
+const tierInput = z
+  .object({
+    unit: z.enum(["DAY", "MONTH"]),
+    minQty: z.number().int().min(1).max(10_000),
+    maxQty: z.number().int().min(1).max(10_000).nullable(),
+    pricing: z.enum(["PER_UNIT", "TOTAL"]),
+    amount: z.number().int().nonnegative().max(10_000_000),
+  })
+  .strict()
+  .refine((t) => t.maxQty === null || t.maxQty >= t.minQty, {
+    message: "A tier's end must not be before its start.",
+  });
+const pricingInput = z
+  .object({
+    priceDaily: price,
+    priceMonthly: price,
+    tiers: z.array(tierInput).max(30),
+    robotId: z.string().min(1).optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    for (const unit of ["DAY", "MONTH"] as const) {
+      const tiers = value.tiers
+        .filter((t) => t.unit === unit)
+        .sort((a, b) => a.minQty - b.minQty);
+      tiers.forEach((tier, i) => {
+        const next = tiers.at(i + 1);
+        if (!next) return;
+        if (tier.maxQty === null || tier.maxQty >= next.minQty)
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `${unit === "DAY" ? "Day" : "Month"} tiers overlap: ${tier.minQty}${tier.maxQty === null ? "+" : `–${tier.maxQty}`} and ${next.minQty}+.`,
+          });
+      });
+    }
+  });
+const tierOrder = [{ unit: "asc" as const }, { minQty: "asc" as const }];
+const tierFields = {
+  unit: true,
+  minQty: true,
+  maxQty: true,
+  pricing: true,
+  amount: true,
+};
 const serialKey = (value: string | null | undefined) =>
   value?.trim().normalize("NFKC").toUpperCase() || null;
 const jsonValue = (value: unknown): Prisma.InputJsonValue =>
@@ -168,7 +215,14 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
         if (parts[0] === "models" && parts.length === 1) {
           return json(
             await db.robotModel.findMany({
-              select: { id: true, brand: true, model: true },
+              select: {
+                id: true,
+                brand: true,
+                model: true,
+                priceDaily: true,
+                priceMonthly: true,
+                priceTiers: { select: tierFields, orderBy: tierOrder },
+              },
               orderBy: [{ brand: "asc" }, { model: "asc" }],
             }),
           );
@@ -509,6 +563,61 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
                 },
               });
             } else throw new RegistryError(404, "Not found.");
+          } else if (
+            parts[0] === "models" &&
+            parts.length === 3 &&
+            parts[2] === "pricing" &&
+            request.method === "POST"
+          ) {
+            const { robotId, ...data } = pricingInput.parse(body);
+            const model = await tx.robotModel.findUnique({
+              where: { id: parts[1] },
+              select: {
+                id: true,
+                brand: true,
+                model: true,
+                priceDaily: true,
+                priceMonthly: true,
+                priceTiers: { select: tierFields, orderBy: tierOrder },
+              },
+            });
+            if (!model) throw new RegistryError(404, "Robot model not found.");
+            await tx.robotModelPriceTier.deleteMany({ where: { modelId: model.id } });
+            if (data.tiers.length)
+              await tx.robotModelPriceTier.createMany({
+                data: data.tiers.map((t) => ({ ...t, modelId: model.id })),
+              });
+            const after = await tx.robotModel.update({
+              where: { id: model.id },
+              data: { priceDaily: data.priceDaily, priceMonthly: data.priceMonthly },
+              select: {
+                id: true,
+                brand: true,
+                model: true,
+                priceDaily: true,
+                priceMonthly: true,
+                priceTiers: { select: tierFields, orderBy: tierOrder },
+              },
+            });
+            // The price sheet belongs to the model; when it is edited from a
+            // robot's page, that robot's history records the change.
+            if (robotId) {
+              const robot = await tx.robotAsset.findUnique({
+                where: { id: robotId },
+                select: { id: true, modelId: true },
+              });
+              if (robot?.modelId === model.id)
+                await tx.robotAudit.create({
+                  data: {
+                    robotId: robot.id,
+                    kind: "MODEL_PRICING_UPDATED",
+                    data: jsonValue({ before: model, after }),
+                    actorId: actor.id,
+                    actorEmail: actor.email!,
+                  },
+                });
+            }
+            result = after;
           } else throw new RegistryError(404, "Not found.");
           const response = jsonValue(result);
           await tx.robotRequest.create({ data: { key, hash, response } });

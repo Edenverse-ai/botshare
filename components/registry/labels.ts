@@ -79,6 +79,8 @@ export function formatHours(value: string | number | null) {
     : String(value);
 }
 
+export { formatTier, formatUsd } from "@/lib/priceTiers";
+
 /** Label/value rows for an operational record, in a stable reading order. */
 export function recordRows(data: Record<string, unknown>) {
   return Object.keys(RECORD_FIELD_LABELS)

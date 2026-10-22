@@ -8,13 +8,14 @@ import {
   useState,
 } from "react";
 import IdentityPanel from "./IdentityPanel";
+import PricingPanel from "./PricingPanel";
 import RobotLabel from "./RobotLabel";
 import RecordPanel from "./RecordPanel";
 import HistoryPanel from "./HistoryPanel";
 import { CONDITION_LABELS, LIFECYCLE_LABELS, identityFields } from "./labels";
-import { Robot, field, button } from "./types";
+import { RegistryModel, Robot, field, button } from "./types";
 
-type Model = { id: string; brand: string; model: string };
+type Model = RegistryModel;
 function numberOrNull(value: FormDataEntryValue | null) {
   const text = typeof value === "string" ? value.trim() : "";
   return text ? Number(text) : null;
@@ -60,11 +61,13 @@ export default function RegistryDashboard({
   useEffect(() => {
     refresh().catch((e) => setError(e.message));
   }, [refresh]);
+  const loadModels = useCallback(
+    async () => setModels(await call("models")),
+    [call],
+  );
   useEffect(() => {
-    call("models")
-      .then(setModels)
-      .catch((e) => setError(e.message));
-  }, [call]);
+    loadModels().catch((e) => setError(e.message));
+  }, [loadModels]);
   useEffect(() => {
     const publicId = new URLSearchParams(window.location.search).get(
       "publicId",
@@ -150,6 +153,7 @@ export default function RegistryDashboard({
   const sections = selected
     ? [
         ["details", "Details"],
+        ["pricing", "Pricing"],
         ["evidence", "Photos & registration"],
         ...(selected.publicId
           ? [
@@ -526,6 +530,23 @@ export default function RegistryDashboard({
             )}
           </section>
 
+          {selected && (
+            <PricingPanel
+              // Remount when the model or its saved prices change.
+              key={`pricing-${selected.id}-${selected.modelId}-${JSON.stringify(
+                models.find((m) => m.id === selected.modelId) ?? null,
+              )}`}
+              robot={selected}
+              model={models.find((m) => m.id === selected.modelId)}
+              call={call}
+              busy={busy}
+              run={act}
+              reload={async () => {
+                await loadModels();
+                setSelected(await call(`robots/${selected.id}`));
+              }}
+            />
+          )}
           {selected && (
             <IdentityPanel
               key={`identity-panel-${selected.id}:${selected.version}`}
