@@ -102,7 +102,9 @@ function ForgotPasswordModal() {
         setResendIn(RESEND_SECONDS);
         toast.success("A new code is on its way.");
       })
-      .catch(() => toast.error("Could not resend the code."));
+      .catch((err) =>
+        toast.error(err?.response?.data?.error ?? "Could not resend the code.")
+      );
   }, [email, resendIn]);
 
   const backButton = (to: Step) => (

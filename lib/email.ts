@@ -253,3 +253,27 @@ export async function sendPasswordResetCode(
   });
   if (error) throw new Error(`Resend password reset email failed: ${JSON.stringify(error)}`);
 }
+
+/**
+ * Runs one send and reports whether it actually left, instead of letting a
+ * transport failure pass for success.
+ *
+ * Every caller is an auth flow whose only output is the email, so a swallowed
+ * failure strands the user on a screen waiting for mail that will never come.
+ * That is precisely how the pre-rebrand `botsharing.us` sender stayed invisible
+ * for months: Resend refused every send with 403 "domain is not verified", the
+ * routes logged it and returned ok, and the UI kept saying "Check your inbox".
+ * Callers must branch on the result rather than discard it.
+ */
+export async function attemptSend(
+  context: string,
+  send: () => Promise<void>
+): Promise<boolean> {
+  try {
+    await send();
+    return true;
+  } catch (err) {
+    console.error(`[${context}] email send failed:`, err);
+    return false;
+  }
+}

@@ -1,10 +1,13 @@
 import { getWritesBlockedResponse } from "@/lib/writeGuard";
 import { issueVerificationCode } from "@/lib/emailVerification";
-import { sendVerificationCode } from "@/lib/email";
+import { attemptSend, sendVerificationCode } from "@/lib/email";
 import { findUserByEmail, normalizeEmail } from "@/lib/emailAddress";
 import { AUTH_RATE_LIMITS, clientIp } from "@/lib/rateLimit";
 import { getRateLimitResponse } from "@/lib/rateLimitResponse";
 import { NextResponse } from "next/server";
+
+const SEND_FAILED =
+  "We could not send the email just now. Please try again in a moment.";
 
 export async function POST(request: Request) {
   const writesBlocked = getWritesBlockedResponse();
@@ -25,14 +28,25 @@ export async function POST(request: Request) {
   if (limited) return limited;
 
   const user = await findUserByEmail(email);
-  // Always respond ok — including when the transport fails — so the response
-  // never reveals whether an address has an account.
+  // An address with no unverified account still gets a bare ok, so the happy
+  // path reveals nothing. A transport failure does return 502, which during an
+  // outage distinguishes "unverified account exists" from "nothing here" — an
+  // acceptable trade, because POST /api/register already answers that question
+  // outright with 409, and because a resend that silently fails is the exact
+  // defect that hid the botsharing.us outage. Close the 409 leak and this one
+  // is worth revisiting.
   if (user && !user.emailVerified) {
+    let sent = false;
     try {
       const code = await issueVerificationCode(email, "signup");
-      await sendVerificationCode(email, code, user.name);
+      sent = await attemptSend("verify-email/resend", () =>
+        sendVerificationCode(email, code, user.name)
+      );
     } catch (err) {
-      console.error("[verify-email/resend] failed:", err);
+      console.error("[verify-email/resend] could not issue a code:", err);
+    }
+    if (!sent) {
+      return NextResponse.json({ error: SEND_FAILED }, { status: 502 });
     }
   }
 

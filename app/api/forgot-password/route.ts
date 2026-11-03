@@ -1,10 +1,13 @@
 import { getWritesBlockedResponse } from "@/lib/writeGuard";
 import { issueVerificationCode } from "@/lib/emailVerification";
-import { sendPasswordResetCode } from "@/lib/email";
+import { attemptSend, sendPasswordResetCode } from "@/lib/email";
 import { findUserByEmail, normalizeEmail } from "@/lib/emailAddress";
 import { AUTH_RATE_LIMITS, clientIp } from "@/lib/rateLimit";
 import { getRateLimitResponse } from "@/lib/rateLimitResponse";
 import { NextResponse } from "next/server";
+
+const SEND_FAILED =
+  "We could not send the email just now. Please try again in a moment.";
 
 export async function POST(request: Request) {
   const writesBlocked = getWritesBlockedResponse();
@@ -26,14 +29,21 @@ export async function POST(request: Request) {
   if (limited) return limited;
 
   const user = await findUserByEmail(email);
-  // Always respond ok — including when the transport fails — so the response
-  // never reveals whether an address has an account.
+  // Same trade as verify-email/resend: an unknown address still gets a bare ok,
+  // but a transport failure is reported rather than swallowed. Telling someone
+  // their reset code is on the way when it is not costs them the account.
   if (user && user.hashedPassword) {
+    let sent = false;
     try {
       const code = await issueVerificationCode(email, "reset");
-      await sendPasswordResetCode(email, code, user.name);
+      sent = await attemptSend("forgot-password", () =>
+        sendPasswordResetCode(email, code, user.name)
+      );
     } catch (err) {
-      console.error("[forgot-password] failed:", err);
+      console.error("[forgot-password] could not issue a code:", err);
+    }
+    if (!sent) {
+      return NextResponse.json({ error: SEND_FAILED }, { status: 502 });
     }
   }
 

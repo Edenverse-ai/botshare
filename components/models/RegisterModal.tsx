@@ -93,8 +93,18 @@ function RegisterModal() {
 
     axios
       .post("/api/register", payload)
-      .then(() => {
+      .then((res) => {
         setStep("verify");
+        // The account exists, so the verify step is still the right place to
+        // land — but when the mail did not go out, say so instead of pointing
+        // at an inbox that will stay empty. No cooldown in that case: Resend
+        // is the user's only way forward.
+        if (res.data?.emailSent === false) {
+          toast.error(
+            "Account created, but the verification code could not be sent. Tap Resend to try again."
+          );
+          return;
+        }
         setResendIn(RESEND_SECONDS);
         toast.success("We sent a verification code to your email.");
       })
@@ -125,7 +135,9 @@ function RegisterModal() {
         setResendIn(RESEND_SECONDS);
         toast.success("A new code is on its way.");
       })
-      .catch(() => toast.error("Could not resend the code."));
+      .catch((err) =>
+        toast.error(err?.response?.data?.error ?? "Could not resend the code.")
+      );
   }, [email, resendIn]);
 
   const kicker = (label: string) => (

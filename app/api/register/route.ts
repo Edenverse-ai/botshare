@@ -1,7 +1,7 @@
 import prisma from "@/lib/prismadb";
 import { getWritesBlockedResponse } from "@/lib/writeGuard";
 import { issueVerificationCode } from "@/lib/emailVerification";
-import { sendVerificationCode } from "@/lib/email";
+import { attemptSend, sendVerificationCode } from "@/lib/email";
 import { findUserByEmail, normalizeEmail } from "@/lib/emailAddress";
 import { AUTH_RATE_LIMITS, clientIp } from "@/lib/rateLimit";
 import { getRateLimitResponse } from "@/lib/rateLimitResponse";
@@ -89,15 +89,19 @@ export async function POST(request: Request) {
     },
   });
 
-  // Issue + email the verification code. Storing the code is what matters for
-  // the flow; if the email transport hiccups we still return ok and let the
-  // user hit "Resend".
+  // Issue + email the verification code. The account exists either way, so a
+  // send failure is not fatal — the user can retry from the verify step. But
+  // it must be reported: the client has to say the code is not coming rather
+  // than park the user on "Check your inbox".
+  let emailSent = false;
   try {
     const code = await issueVerificationCode(email, "signup");
-    await sendVerificationCode(email, code, name);
+    emailSent = await attemptSend("register", () =>
+      sendVerificationCode(email, code, name)
+    );
   } catch (err) {
-    console.error("[register] verification email failed:", err);
+    console.error("[register] could not issue a verification code:", err);
   }
 
-  return NextResponse.json({ ok: true, id: user.id });
+  return NextResponse.json({ ok: true, id: user.id, emailSent });
 }
