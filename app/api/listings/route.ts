@@ -43,6 +43,19 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  // Selling requires a verified seller. Submitting a robot to the registry does
+  // not — an administrator needs something concrete to review before deciding
+  // whether the company is real, and gating both would deadlock onboarding.
+  // Profile completeness is a form check; this is the trust decision.
+  if (!currentUser.verified && !isAdminEmail(currentUser.email)) {
+    return NextResponse.json(
+      {
+        error:
+          "Hifivebot has not verified your account yet. Submit your robots to the Robot Registry and we will review them together.",
+      },
+      { status: 403 }
+    );
+  }
 
   if (!title || !description || !imageSrc) {
     return NextResponse.json(
