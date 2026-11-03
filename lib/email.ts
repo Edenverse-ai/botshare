@@ -9,7 +9,17 @@ function getResend(): Resend {
   return _resend;
 }
 
-const FROM = process.env.RESEND_FROM_EMAIL ?? "bookings@hifivebot.com";
+/**
+ * Booking mail is conversational — a customer may well reply to it — so it
+ * keeps a monitored mailbox. Account mail (verification codes, password
+ * resets) is machine-generated and must never invite a reply, so it goes out
+ * from no-reply. Both are on hifivebot.com, so one domain verification in
+ * Resend covers them — but a sender on any other domain needs its own.
+ */
+const FROM = `Hifivebot <${process.env.RESEND_FROM_EMAIL ?? "bookings@hifivebot.com"}>`;
+const AUTH_FROM = `Hifivebot <${
+  process.env.RESEND_AUTH_FROM_EMAIL ?? "no-reply@hifivebot.com"
+}>`;
 const LOGO_URL = "https://hifivebot.com/hifivebot-logo.png";
 const SITE_URL = "https://hifivebot.com";
 
@@ -206,7 +216,7 @@ export async function sendVerificationCode(
   `;
 
   const { error } = await getResend().emails.send({
-    from: FROM,
+    from: AUTH_FROM,
     to: email,
     subject: `Your Hifivebot verification code: ${code}`,
     html: emailLayout(body),
@@ -236,7 +246,7 @@ export async function sendPasswordResetCode(
   `;
 
   const { error } = await getResend().emails.send({
-    from: FROM,
+    from: AUTH_FROM,
     to: email,
     subject: `Your Hifivebot password reset code: ${code}`,
     html: emailLayout(body),
