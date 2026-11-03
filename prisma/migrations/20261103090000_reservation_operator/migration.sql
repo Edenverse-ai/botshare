@@ -6,7 +6,9 @@
 -- service delivery is not. Nullable, recorded only — no dispatch, scheduling
 -- or notification logic hangs off it.
 --
--- Additive, so it is safe to apply before or after the deploy.
+-- APPLY THIS BEFORE PUBLISHING THE NEW CODE. Additive, so the published
+-- deploy ignores it, but the new admin orders page includes the operator
+-- relation and fails without the column.
 
 -- AlterTable
 ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "operatorId" TEXT;
