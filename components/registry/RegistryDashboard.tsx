@@ -23,8 +23,11 @@ function numberOrNull(value: FormDataEntryValue | null) {
 
 export default function RegistryDashboard({
   environment,
+  canAdminister = false,
 }: {
   environment: string;
+  /** Administrators judge claims; owners only submit and maintain their own. */
+  canAdminister?: boolean;
 }) {
   const [robots, setRobots] = useState<Robot[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -536,7 +539,48 @@ export default function RegistryDashboard({
             )}
           </section>
 
-          {selected && (
+          {selected && !canAdminister && (
+            <section className="rounded-lg border border-neutral-200 p-4">
+              <h2 className="font-semibold">Review</h2>
+              {selected.lifecycle === "DRAFT" && (
+                <>
+                  <p className="mt-1 text-sm text-neutral-600">
+                    Hifivebot checks the nameplate against the serial you
+                    entered, then issues a permanent Robot ID. Add the model,
+                    serial number and a nameplate photograph first.
+                  </p>
+                  <button
+                    className={button}
+                    disabled={busy}
+                    onClick={() =>
+                      act(async () => {
+                        await call(`robots/${selected.id}/submit`, "POST", {});
+                        setSelected(await call(`robots/${selected.id}`));
+                        await refresh();
+                      })
+                    }
+                  >
+                    Send for review
+                  </button>
+                </>
+              )}
+              {selected.lifecycle === "IN_REVIEW" && (
+                <p className="mt-1 text-sm text-neutral-600">
+                  In review. Nothing is needed from you — a Robot ID is issued
+                  once the nameplate matches the serial you entered.
+                </p>
+              )}
+              {selected.lifecycle === "REGISTERED" && (
+                <p className="mt-1 text-sm text-neutral-600">
+                  Registered as {selected.publicId}. The model, serial number,
+                  nameplate and owner are locked; ask Hifivebot to correct one.
+                  Location, hours, firmware and notes stay yours to change.
+                </p>
+              )}
+            </section>
+          )}
+
+          {selected && canAdminister && (
             <PricingPanel
               // Remount when the model or its saved prices change.
               key={`pricing-${selected.id}-${selected.modelId}-${JSON.stringify(
@@ -553,7 +597,7 @@ export default function RegistryDashboard({
               }}
             />
           )}
-          {selected && (
+          {selected && canAdminister && (
             <IdentityPanel
               key={`identity-panel-${selected.id}:${selected.version}`}
               robot={selected}
@@ -565,7 +609,7 @@ export default function RegistryDashboard({
               }
             />
           )}
-          {selected?.publicId && (
+          {selected?.publicId && canAdminister && (
             <RobotLabel
               key={selected.id}
               robot={selected}
@@ -578,7 +622,7 @@ export default function RegistryDashboard({
               }
             />
           )}
-          {selected?.publicId && (
+          {selected?.publicId && canAdminister && (
             <RecordPanel
               key={`records-${selected.id}`}
               robot={selected}

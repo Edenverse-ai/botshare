@@ -1,5 +1,5 @@
 import getCurrentUser from "@/app/actions/getCurrentUser";
-import { isAdminEmail } from "@/lib/adminAuth";
+import { canManageServices, isAdminEmail } from "@/lib/adminAuth";
 import RegistryDashboard from "@/components/registry/RegistryDashboard";
 import RegistrySignIn from "@/components/registry/RegistrySignIn";
 
@@ -7,15 +7,19 @@ export const dynamic = "force-dynamic";
 export default async function RobotRegistry() {
   const user = await getCurrentUser();
   if (!user) return <RegistrySignIn />;
-  if (!isAdminEmail(user.email))
+  // Owners submit and maintain their own machines here; administrators see
+  // every robot and the controls that confer identity. The API enforces both,
+  // so this only decides what is worth rendering.
+  if (!canManageServices(user))
     return (
       <main className="mx-auto max-w-4xl p-8">
-        Administrator access required.
+        A provider or administrator account is required.
       </main>
     );
   return (
     <RegistryDashboard
       environment={process.env.REGISTRY_ENVIRONMENT || "unconfigured"}
+      canAdminister={isAdminEmail(user.email)}
     />
   );
 }
