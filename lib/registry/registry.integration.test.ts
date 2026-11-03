@@ -33,13 +33,23 @@ async function ensureOwners() {
   for (const [id, email, businessName] of [
     ["test-owner", OWNER_EMAIL, "Hifivebot"],
     ["test-other-owner", OTHER_OWNER_EMAIL, "Another owner"],
+    ["provider", "provider@registry.test", "Test provider"],
   ]) {
     await db.user.upsert({
       where: { id },
-      update: {},
-      create: { id, email, businessName },
+      update: { userType: "PROVIDER" },
+      create: { id, email, businessName, userType: "PROVIDER" },
     });
   }
+  await db.user.upsert({
+    where: { id: "customer" },
+    update: { userType: "CUSTOMER" },
+    create: {
+      id: "customer",
+      email: "customer@registry.test",
+      userType: "CUSTOMER",
+    },
+  });
 }
 const api = createRegistryHandler({ db, actor: async () => actor });
 async function request(
@@ -131,7 +141,7 @@ describe.skipIf(!enabled)(
       expect(update.status).toBe(200);
       const read = await (await request(`robots/${robot.id}`)).json();
       expect(read.location).toBe("Test storage");
-      expect(read.owner.email).toBe(OWNER_EMAIL);
+      expect(read.ownerId).toBeNull();
       expect(read.audit.map((event: { kind: string }) => event.kind)).toEqual([
         "CREATED",
         "UPDATED",
@@ -142,11 +152,11 @@ describe.skipIf(!enabled)(
       ).toBe(409);
     });
 
-    it("denies private access to anonymous users, customers and providers, and observes the write guard", async () => {
+    it("denies private access to anonymous users and customers, and observes the write guard", async () => {
+      await ensureOwners();
       for (const identity of [
         null,
         { id: "customer", email: "customer@registry.test" },
-        { id: "provider", email: "provider@registry.test" },
       ]) {
         const handler = createRegistryHandler({
           db,
@@ -168,6 +178,55 @@ describe.skipIf(!enabled)(
       }
     });
 
+    it("lets a robot owner submit and see only their own machines, and refuses them an administrator's controls", async () => {
+      await ensureOwners();
+      const owner = { id: "provider", email: "provider@registry.test" };
+      const asOwner = createRegistryHandler({ db, actor: async () => owner });
+
+      // Someone else's robot is not theirs to see.
+      const foreign = await registeredRobot();
+      expect(
+        (await request(`robots/${foreign.id}`, "GET", undefined, randomUUID(), asOwner))
+          .status,
+      ).toBe(404);
+
+      // Their own draft is theirs whatever the body claims about ownership.
+      const draft = await (
+        await request(
+          "robots",
+          "POST",
+          { location: "Owner workshop", ownerEmail: OTHER_OWNER_EMAIL },
+          randomUUID(),
+          asOwner,
+        )
+      ).json();
+      expect(draft.ownerId).toBe(owner.id);
+
+      const list = await (
+        await request("robots", "GET", undefined, randomUUID(), asOwner)
+      ).json();
+      expect(list.map((r: { id: string }) => r.id)).toEqual([draft.id]);
+
+      // Registering is the administrator's act, not theirs.
+      expect(
+        (
+          await request(
+            `robots/${draft.id}/register`,
+            "POST",
+            { ownerConfirmed: true, nameplateId: "x", version: draft.version },
+            randomUUID(),
+            asOwner,
+          )
+        ).status,
+      ).toBe(403);
+
+      // An incomplete submission gives a reviewer nothing to compare.
+      expect(
+        (await request(`robots/${draft.id}/submit`, "POST", {}, randomUUID(), asOwner))
+          .status,
+      ).toBe(400);
+    });
+
     it("registers a verified robot exactly once and retains evidence privately", async () => {
       const model = await db.robotModel.create({
         data: {
@@ -185,6 +244,7 @@ describe.skipIf(!enabled)(
         await request("robots", "POST", {
           modelId: model.id,
           serialNumber: `TEST-${randomUUID()}`,
+          ownerEmail: OWNER_EMAIL,
         })
       ).json();
       expect(

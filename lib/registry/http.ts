@@ -167,6 +167,15 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
       // inspecting, retiring, pricing, labels, operational records — stays
       // with administrators. Anything not on this list is theirs alone.
       if (!isAdmin) {
+        // Only a provider owns robots. A customer account has no business in
+        // the registry at all, and without this check "not an administrator"
+        // would have meant "anyone signed in".
+        const actorRecord = await db.user.findUnique({
+          where: { id: actor.id },
+          select: { userType: true },
+        });
+        if (actorRecord?.userType !== "PROVIDER")
+          throw new RegistryError(403, "Administrator access required.");
         const ownerMayReach =
           parts[0] === "robots" &&
           ((request.method === "GET" && parts.length <= 2) ||
