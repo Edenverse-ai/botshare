@@ -1,6 +1,6 @@
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import prisma from "@/lib/prismadb";
-import { canManageServices } from "@/lib/adminAuth";
+import { canManageServices, isAdminEmail } from "@/lib/adminAuth";
 import { isServiceCategory } from "@/lib/serviceCategories";
 import { defaultCategoryForUseCases } from "@/lib/useCases";
 import { isProviderProfileComplete } from "@/lib/providerProfile";
@@ -81,6 +81,7 @@ export async function POST(request: Request) {
       id: true,
       lifecycle: true,
       publicId: true,
+      ownerId: true,
       model: { select: { id: true, useCase: true, priceDaily: true } },
     },
   });
@@ -90,6 +91,25 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  // Owning a robot and selling it are one role: a provider lists only their own
+  // machines. An administrator is the single exception, so a partner can be
+  // onboarded without the platform taking ownership of their inventory — the
+  // listing is still the owner's, and the acting administrator is recorded.
+  const actingAsAdmin = isAdminEmail(currentUser.email);
+  if (!actingAsAdmin && asset.ownerId !== currentUser.id) {
+    return NextResponse.json(
+      { error: "You can only list a robot your account owns." },
+      { status: 403 }
+    );
+  }
+  if (actingAsAdmin && !asset.ownerId) {
+    return NextResponse.json(
+      { error: "This robot has no owner account yet. Set one in the Robot Registry first." },
+      { status: 400 }
+    );
+  }
+  const listingOwnerId = asset.ownerId ?? currentUser.id;
   const model = asset.model;
 
   if (model.priceDaily == null) {
@@ -134,11 +154,29 @@ export async function POST(request: Request) {
       lat: zipData.lat,
       lng: zipData.lng,
       price: derivedPrice,
-      userId: currentUser.id,
+      userId: listingOwnerId,
       robotModelId: model.id,
       robotAssetId: asset.id,
     },
   });
+
+  // An administrator acting for an owner leaves a trace on the robot, which is
+  // where anyone asking "who put this on sale?" will look.
+  if (actingAsAdmin && listingOwnerId !== currentUser.id) {
+    await prisma.robotAudit.create({
+      data: {
+        robotId: asset.id,
+        kind: "LISTED_BY_ADMIN",
+        data: {
+          listingId: listing.id,
+          listingTitle: listing.title,
+          onBehalfOfUserId: listingOwnerId,
+        },
+        actorId: currentUser.id,
+        actorEmail: currentUser.email!,
+      },
+    });
+  }
 
   return NextResponse.json(listing);
 }
