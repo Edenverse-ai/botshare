@@ -69,3 +69,6 @@ deno.lock
 /.auth-test-results/
 # Robot catalog: extracted images are regenerable, keep out of git
 data/robot-catalog/robot-images/
+
+# Production rows exported before a destructive script runs — never commit.
+scripts/.deleted-*.json
