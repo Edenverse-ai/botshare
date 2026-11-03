@@ -28,10 +28,12 @@ import { DEPLOY_URL_SUFFIX, getSite, listDeploys, netlify, SITE_ID } from "./net
 // `/services` lists robot tags from the catalog, but probe a scenario page too —
 // it queries listings for its category on every request.
 const DB_ROUTE = "/services/entertainment";
-// getListings() dedupes the public catalog by title, so a category renders one
-// row per distinct package (3-4 today). A missing query engine renders zero, so
-// any non-trivial count still proves the database answered.
-const MIN_DB_IDS = 3;
+// A missing query engine renders zero rows, which is what this guard exists to
+// catch. The threshold was 3 when the catalog was padded with 144 generated
+// listings; those were deleted, so a scenario page now renders the real count
+// — one. Anything above zero still proves the query path answered end to end,
+// and raising this again would only block publishes on a small real catalog.
+const MIN_DB_IDS = 1;
 
 async function get(url) {
   const res = await fetch(url, { redirect: "follow" });
