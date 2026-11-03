@@ -18,6 +18,9 @@ export type SafeReservation = Omit<
 };
 
 export type SafeAdminReservation = SafeReservation & {
+  /** Who physically performs the service, when that is not the provider. */
+  operatorEmail: string | null;
+  operatorLabel: string | null;
   customerName: string;
   customerEmail: string;
   customerPhone: string | null;

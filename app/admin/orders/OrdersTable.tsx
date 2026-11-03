@@ -24,6 +24,22 @@ export default function OrdersTable({ reservations }: Props) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [savingOperatorFor, setSavingOperatorFor] = useState<string | null>(null);
+
+  // Who physically performs the service. Recorded only — setting it assigns
+  // nothing and notifies nobody.
+  const handleOperator = async (id: string, operatorEmail: string) => {
+    setSavingOperatorFor(id);
+    try {
+      await axios.patch(`/api/reservations/${id}/operator`, { operatorEmail });
+      toast.success(operatorEmail ? "Operator recorded" : "Operator cleared");
+      router.refresh();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? "Could not record the operator");
+    } finally {
+      setSavingOperatorFor(null);
+    }
+  };
 
   const handleCancel = async (id: string) => {
     if (!window.confirm("Cancel this booking?")) return;
@@ -128,6 +144,38 @@ export default function OrdersTable({ reservations }: Props) {
                       <span className="font-medium">Business:</span>{" "}
                       {r.customerBusinessName ?? "—"}
                     </span>
+                    <form
+                      className="mt-3 flex flex-wrap items-center gap-2"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const value = new FormData(event.currentTarget).get("operatorEmail");
+                        handleOperator(r.id, String(value ?? "").trim());
+                      }}
+                    >
+                      <label htmlFor={`operator-${r.id}`} className="font-medium">
+                        Performed by
+                      </label>
+                      <input
+                        id={`operator-${r.id}`}
+                        name="operatorEmail"
+                        type="email"
+                        defaultValue={r.operatorEmail ?? ""}
+                        placeholder="operator@company.com"
+                        className="rounded border border-gray-300 px-2 py-1 text-sm"
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingOperatorFor === r.id}
+                        className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {savingOperatorFor === r.id ? "Saving…" : "Save"}
+                      </button>
+                      <span className="text-xs text-gray-500">
+                        {r.operatorLabel
+                          ? `Currently ${r.operatorLabel}. Leave empty to clear.`
+                          : "Not recorded — the provider is assumed to perform it."}
+                      </span>
+                    </form>
                   </td>
                 </tr>
               )}

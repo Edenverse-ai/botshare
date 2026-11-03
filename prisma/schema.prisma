@@ -55,6 +55,7 @@ model User {
   accounts             Account[]
   listings             Listing[]      @relation("ownerListings")
   ownedRobots          RobotAsset[]   @relation("ownedRobots")
+  operatedReservations Reservation[]  @relation("operatedReservations")
   reservations         Reservation[]
   favoriteListings     UserFavorite[]
 }
@@ -124,12 +125,18 @@ model Reservation {
   createdAt       DateTime           @default(now())
   stripeSessionId String?            @unique
   status          OrderStatus        @default(PLACED)
+  // Who physically performs the service. Owning a robot and selling it are one
+  // role; running the job on site can be someone else, and when it is, the
+  // customer's contract is still with the owner. Recorded, never dispatched.
+  operatorId      String?
+  operator        User?              @relation("operatedReservations", fields: [operatorId], references: [id])
   user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   listing         Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
   events          ReservationEvent[]
 
   @@index([listingId])
   @@index([userId])
+  @@index([operatorId])
   @@index([startDate])
   @@index([endDate])
 }
