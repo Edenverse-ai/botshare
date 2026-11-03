@@ -159,8 +159,34 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
       const actor = await getActor();
       if (!actor)
         throw new RegistryError(401, "Sign in to access the robot registry.");
-      if (!isAdminEmail(actor.email))
-        throw new RegistryError(403, "Administrator access required.");
+      const isAdmin = isAdminEmail(actor.email);
+
+      // A robot owner submits their own machines, because the nameplate
+      // evidence registration demands is in their hands, not Hifivebot's.
+      // Everything that confers identity or judges a claim — registering,
+      // inspecting, retiring, pricing, labels, operational records — stays
+      // with administrators. Anything not on this list is theirs alone.
+      if (!isAdmin) {
+        const ownerMayReach =
+          parts[0] === "robots" &&
+          ((request.method === "GET" && parts.length <= 2) ||
+            (request.method === "POST" && parts.length === 1) ||
+            (request.method === "PATCH" && parts.length === 2) ||
+            (request.method === "POST" &&
+              parts.length === 3 &&
+              (parts[2] === "files" || parts[2] === "submit")));
+        if (!ownerMayReach)
+          throw new RegistryError(403, "Administrator access required.");
+        // ...and only ever on their own machines.
+        if (parts.length >= 2) {
+          const target = await db.robotAsset.findUnique({
+            where: { id: parts[1] },
+            select: { ownerId: true },
+          });
+          if (!target || target.ownerId !== actor.id)
+            throw new RegistryError(404, "Robot not found.");
+        }
+      }
       if (request.method === "GET") {
         if (
           parts[0] === "robots" &&
@@ -231,16 +257,22 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
           const search = (url.searchParams.get("search") || "").slice(0, 100);
           return json(
             await db.robotAsset.findMany({
-              where: search
-                ? {
-                    OR: [
-                      {
-                        serialNumber: { contains: search, mode: "insensitive" },
-                      },
-                      { publicId: { contains: search, mode: "insensitive" } },
-                    ],
-                  }
-                : {},
+              where: {
+                ...(isAdmin ? {} : { ownerId: actor.id }),
+                ...(search
+                  ? {
+                      OR: [
+                        {
+                          serialNumber: {
+                            contains: search,
+                            mode: "insensitive",
+                          },
+                        },
+                        { publicId: { contains: search, mode: "insensitive" } },
+                      ],
+                    }
+                  : {}),
+              },
               include: {
                 model: { select: { brand: true, model: true } },
                 owner: { select: { email: true, name: true, businessName: true } },
@@ -336,7 +368,9 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
             const robot = await tx.robotAsset.create({
               data: {
                 ...data,
-                ownerId: await resolveOwnerId(ownerEmail),
+                // An owner submits for themselves; only an administrator may
+                // name a different account.
+                ownerId: isAdmin ? await resolveOwnerId(ownerEmail) : actor.id,
                 serialKey: serialKey(data.serialNumber),
               },
             });
@@ -357,7 +391,33 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
           ) {
             const { version, reason, ownerConfirmed, ownerEmail, ...rest } =
               updateFields.parse(body);
-            const resolvedOwnerId = await resolveOwnerId(ownerEmail);
+            // Reassigning ownership is an administrator's act.
+            const resolvedOwnerId = isAdmin
+              ? await resolveOwnerId(ownerEmail)
+              : undefined;
+            // What a permanent Robot ID vouches for is the identity: the
+            // model, the serial, the evidence it was checked against, and who
+            // owns it. If an owner could change those unilaterally the review
+            // would have decided nothing. Everything an owner keeps current
+            // day to day — location, hours, firmware, notes — stays theirs,
+            // because routing that through an administrator would drown them.
+            if (!isAdmin) {
+              const locked = (
+                [
+                  ["modelId", rest.modelId],
+                  ["manufacturer serial number", rest.serialNumber],
+                  ["nameplate photograph", rest.nameplateId],
+                  ["owner", ownerEmail],
+                ] as const
+              )
+                .filter(([, value]) => value !== undefined)
+                .map(([label]) => label);
+              if (locked.length)
+                throw new RegistryError(
+                  403,
+                  `Hifivebot verified the ${locked.join(", ")} for this robot, so it is locked. Ask Hifivebot to correct it.`,
+                );
+            }
             const data = {
               ...rest,
               ...(resolvedOwnerId === undefined ? {} : { ownerId: resolvedOwnerId }),
@@ -490,12 +550,79 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
                   actorEmail: actor.email!,
                 },
               });
+            } else if (parts[2] === "reject") {
+              if (!isAdmin)
+                throw new RegistryError(403, "Administrator access required.");
+              const data = z
+                .object({ reason: z.string().trim().min(1).max(2000) })
+                .strict()
+                .parse(body);
+              if (robot.lifecycle !== "IN_REVIEW")
+                throw new RegistryError(
+                  409,
+                  "Only a robot waiting for review can be sent back.",
+                );
+              result = await tx.robotAsset.update({
+                where: { id: robot.id },
+                data: { lifecycle: "DRAFT", version: { increment: 1 } },
+              });
+              await tx.robotAudit.create({
+                data: {
+                  robotId: robot.id,
+                  kind: "REJECTED",
+                  // The owner reads this reason on their own robot; it is the
+                  // whole point of sending it back rather than refusing.
+                  data: { reason: data.reason },
+                  actorId: actor.id,
+                  actorEmail: actor.email!,
+                },
+              });
+            } else if (parts[2] === "submit") {
+              if (robot.lifecycle !== "DRAFT")
+                throw new RegistryError(
+                  409,
+                  robot.lifecycle === "IN_REVIEW"
+                    ? "This robot is already waiting for review."
+                    : "Only a draft can be submitted for review.",
+                );
+              // Reviewing means comparing a photographed nameplate against a
+              // typed serial, so refuse a submission that gives the reviewer
+              // nothing to compare.
+              const missing = [
+                robot.modelId ? null : "robot model",
+                robot.serialKey ? null : "manufacturer serial number",
+                robot.ownerId ? null : "owner account",
+                (await tx.robotFile.findFirst({
+                  where: { robotId: robot.id, kind: "NAMEPLATE" },
+                }))
+                  ? null
+                  : "nameplate photograph",
+              ].filter(Boolean);
+              if (missing.length)
+                throw new RegistryError(
+                  400,
+                  `Add the ${missing.join(", ")} before sending this for review.`,
+                );
+              result = await tx.robotAsset.update({
+                where: { id: robot.id },
+                data: { lifecycle: "IN_REVIEW", version: { increment: 1 } },
+              });
+              await tx.robotAudit.create({
+                data: {
+                  robotId: robot.id,
+                  kind: "SUBMITTED",
+                  data: jsonValue(result),
+                  actorId: actor.id,
+                  actorEmail: actor.email!,
+                },
+              });
             } else if (parts[2] === "register") {
               const data = z
                 .object({
                   ownerConfirmed: z.literal(true),
                   nameplateId: z.string().min(1),
                   version: z.number().int().positive(),
+                  verifySeller: z.boolean().optional(),
                 })
                 .strict()
                 .parse(body);
@@ -550,6 +677,12 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
                   where: { id: robot.ownerId },
                   select: { email: true, name: true, businessName: true },
                 });
+                if (data.verifySeller && robot.ownerId) {
+                  await tx.user.update({
+                    where: { id: robot.ownerId },
+                    data: { verified: true },
+                  });
+                }
                 await tx.robotAudit.create({
                   data: {
                     robotId: robot.id,
