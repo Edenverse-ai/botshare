@@ -29,11 +29,6 @@ export default async function getListingById(params: IParams) {
       return null;
     }
 
-    // Unclaimed individual-owned pool robots are not customer-facing.
-    if (listing.isIndividualOwned && listing.status !== "CLAIMED") {
-      return null;
-    }
-
     const { favoriteListings, ...safeListingUser } = listing.user;
 
     return {

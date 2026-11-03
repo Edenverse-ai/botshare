@@ -32,19 +32,11 @@ export async function POST(request: Request) {
 
   const listing = await prisma.listing.findUnique({
     where: { id: listingId },
-    select: { title: true, isIndividualOwned: true, status: true },
+    select: { title: true },
   });
 
   if (!listing) {
     return NextResponse.json({ error: "Service not found." }, { status: 404 });
-  }
-
-  // A pool robot that no operator has claimed yet is not bookable.
-  if (listing.isIndividualOwned && listing.status !== "CLAIMED") {
-    return NextResponse.json(
-      { error: "This robot is not yet available for booking." },
-      { status: 409 }
-    );
   }
 
   const origin = request.headers.get("origin") ?? "https://hifivebot.com";

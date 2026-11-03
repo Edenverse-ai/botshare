@@ -28,7 +28,8 @@ const MyListingsPage = async () => {
   }
 
   const isAdmin = isAdminEmail(currentUser.email);
-  const listings = await getListings(isAdmin ? { adminAll: true } : { userId: currentUser.id });
+  // An admin sees every service; a provider sees only their own.
+  const listings = await getListings(isAdmin ? {} : { userId: currentUser.id });
 
   if (listings.length === 0) {
     return (

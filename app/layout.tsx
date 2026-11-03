@@ -45,7 +45,6 @@ export default async function RootLayout({
           <LoginModal />
           <ForgotPasswordModal />
           {isAdmin && <RentModal />}
-          {currentUser && <RentModal mode="individual" />}
           <Navbar currentUser={currentUser} isAdmin={isAdmin} canManageRegistry={isAdminEmail(currentUser?.email)} />
         </ClientOnly>
         <div className="pb-20 pt-28">{children}</div>

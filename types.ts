@@ -3,7 +3,7 @@ import { OrderStatus } from "@/lib/orderStatus";
 
 export type safeListing = Omit<Listing, "createdAt"> & {
   createdAt: string;
-  operatorName?: string;
+  providerName?: string;
 };
 
 export type SafeReservation = Omit<

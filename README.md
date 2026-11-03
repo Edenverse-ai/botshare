@@ -2,9 +2,8 @@
 
 **Robot service rental marketplace.** Customers browse robots by metro, use case, and
 service category, book them for a date range, pay through Stripe, and track the unit
-through a shipped → delivered → returned lifecycle. Providers list company-owned
-fleets; individuals can put a single robot into a pool that a local operator claims and
-runs on their behalf.
+through a shipped → delivered → returned lifecycle. A service is built on a robot
+registered in the Robot Registry, and its model sets the price.
 
 | | |
 |---|---|
@@ -123,13 +122,11 @@ app/
 │   getListings, getListingById, getReservations, getAllReservations,
 │   getAvailableRobots, getMyRobots, getOrderById, getFavoriteListings, getCurrentUser
 ├── api/                     App Router API routes
-│   listings/  listings/[id]/claim/  reservations/  reservations/[id]/status/
+│   listings/  reservations/  reservations/[id]/status/
 │   checkout/  favorites/  register/  profile/  upload/  robot-models/
 │   verify-email/  forgot-password/  reset-password/  zip-check/
 ├── services/                browse + filter the catalog
 ├── listings/[listingId]/    service detail + booking widget
-├── available-robots/        operator view of the unclaimed individual pool
-├── my-robots/               individual owner's submitted robots
 ├── my-listings/             provider's own services
 ├── orders/[reservationId]/  order timeline + status transitions
 ├── trips/  reservations/  favorites/  profile/
@@ -151,7 +148,6 @@ lib/
 ├── adminAuth.ts            isAdminEmail(), canManageServices()
 ├── writeGuard.ts           read-only lock for migration cutovers
 ├── orderStatus.ts          order lifecycle: statuses, labels, transition table
-├── individualListing.ts    pool claim rules + catalog visibility predicates
 ├── serviceCategories.ts    the 3 canonical categories
 ├── useCases.ts             the 6 canonical use cases
 ├── robotModel.ts, robotTypeCatalog.ts    robot taxonomy
@@ -175,7 +171,7 @@ scripts/  seeding, catalog builds, migration helpers, deploy promotion
   **videos** are hosted on Cloudinary — never commit video files; `public/videos/*.mp4|.mov|.webm`
   is gitignored.
 - **Route protection**: `middleware.ts` gates `/trips`, `/reservations`, `/my-listings`,
-  `/favorites`, `/profile`, `/my-robots`, `/available-robots`, `/orders/*`, `/admin/orders`.
+  `/favorites`, `/profile`, `/orders/*`, `/admin/orders`.
   The middleware only checks *authentication* — authorization is enforced per-route in the
   API layer.
 
@@ -186,7 +182,7 @@ Postgres via Prisma (`prisma/schema.prisma`).
 | Model | Notes |
 |---|---|
 | `User` | `userType: CUSTOMER \| PROVIDER` is the canonical role flag. Also `businessName`, `phone`, `verified`, terms-acceptance stamps. |
-| `Listing` | A bookable service. `price` = **per day**. `metro`, `zipCode`, `lat`, `lng` drive proximity search. `robotModelId` links the catalog entry; `sku` + `skuImageSrc` capture the physical unit. `isIndividualOwned` + `status` + `operatorId` + `claimedAt` implement the pool. |
+| `Listing` | A bookable service. `price` = **per day**. `metro`, `zipCode`, `lat`, `lng` drive proximity search. `robotModelId` links the catalog entry; `robotAssetId` links the registered physical robot; `sku` + `skuImageSrc` capture the physical unit. |
 | `Reservation` | A booking. `status: OrderStatus`, unique `stripeSessionId` set after checkout. |
 | `ReservationEvent` | Append-only audit row per status transition (actor + optional note). |
 | `RobotModel` | Curated catalog seeded from `data/robot-catalog/`. Carries brand/model, `useCase[]`, `serviceCategory`, `capabilityTag`, hourly/daily/monthly prices, and `listable` (controls whether it appears in the create-service picker). `msrp` is reference-only and must never be used as a rental price. |
@@ -194,7 +190,7 @@ Postgres via Prisma (`prisma/schema.prisma`).
 | `EmailVerificationCode` | One active hashed code per email, with expiry and attempt counter. |
 
 Enums: `UserType`, `Metro` (`SF`, `LA`, `VEGAS`, `DALLAS`, `NYC`, `MIAMI`),
-`ListingStatus` (`AVAILABLE`, `CLAIMED`), `OrderStatus` (below).
+`OrderStatus` (below).
 
 `guestCount`, `roomCount`, and `bathroomCount` on `Listing` are legacy compatibility
 fields. Do not repurpose them.
@@ -204,8 +200,7 @@ fields. Do not repurpose them.
 ### Booking and payment
 
 1. Customer picks a date range on `/listings/[listingId]`.
-2. `POST /api/checkout` validates the listing, refuses unclaimed pool robots (409), and
-   creates a Stripe Checkout Session.
+2. `POST /api/checkout` validates the listing and creates a Stripe Checkout Session.
 3. Stripe redirects to `/checkout/success`, which finalizes the `Reservation` and stores
    `stripeSessionId`.
 4. Resend sends the customer confirmation and the admin notification (`lib/email.ts`).
@@ -226,19 +221,12 @@ transition. Cancellation is open to customer/provider only *before* the robot sh
 Transitions run through `PATCH /api/reservations/[reservationId]/status` and each one
 writes a `ReservationEvent`.
 
-### Individual robot pool
+### Who may list a service
 
-An individual lists a robot they own; it is stored with `isIndividualOwned = true` and
-`status = AVAILABLE`. It is **not** visible to customers and **not** bookable in that
-state. A provider or admin claims it via `POST /api/listings/[listingId]/claim` with a
-5-digit operating zip, which sets `status = CLAIMED`, records `operatorId`/`claimedAt`,
-and resolves the zip to a supported metro. Only then does it enter the customer catalog.
-The owner earns `INDIVIDUAL_EARNINGS_PERCENT` (15%) of the booking price. A SKU may have
-only one active (`AVAILABLE` or `CLAIMED`) individual listing at a time.
-
-All of these rules are pure functions in `lib/individualListing.ts`
-(`canClaimListing`, `isCustomerVisible`, `customerVisibilityWhere`, `hasActiveSkuConflict`)
-so they stay unit-testable and cannot drift between the API layer and the query layer.
+Creating a service requires a provider or admin account with a complete provider
+profile, and a robot already registered in the Robot Registry. The robot's model
+supplies the price; the client cannot set it. The individual-owner pool that once let
+any account offer a robot for an operator to claim was withdrawn.
 
 ## Roles and access control
 
@@ -382,8 +370,8 @@ npm run lint    # required before any PR or merge
 npm test        # vitest
 ```
 
-Unit tests cover the pure decision logic — `lib/orderStatus.test.ts` (transition table)
-and `lib/individualListing.test.ts` (pool claim and visibility rules). New business rules
+Unit tests cover the pure decision logic — `lib/orderStatus.test.ts` (transition table).
+New business rules
 belong in a pure, DB-free module in `lib/` with tests, not inline in a route handler.
 
 ## Data and one-off scripts

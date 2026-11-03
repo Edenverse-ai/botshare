@@ -89,9 +89,9 @@ function ListingCard({
           </div>
         </div>
         <div className="font-semibold text-lg">{serviceDetail}</div>
-        {data.operatorName && (
+        {data.providerName && (
           <div className="font-light text-neutral-500">
-            By {data.operatorName}
+            By {data.providerName}
           </div>
         )}
         <div className="flex flex-row items-center">

@@ -56,7 +56,7 @@ export default async function getAllReservations(
         listing: {
           ...r.listing,
           createdAt: r.listing.createdAt.toISOString(),
-          // operatorName intentionally omitted — listing.user not included in query
+          // providerName intentionally omitted — listing.user not included in query
         },
         customerName: user.name ?? "",
         customerEmail: user.email ?? "",
