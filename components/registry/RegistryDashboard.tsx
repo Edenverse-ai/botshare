@@ -120,7 +120,7 @@ export default function RegistryDashboard({
       const data = {
         modelId: form.get("modelId") || null,
         serialNumber: form.get("serialNumber") || null,
-        ownerName: form.get("ownerName"),
+        ownerEmail: form.get("ownerEmail") || null,
         location: form.get("location"),
         notes: form.get("notes"),
         insurance: form.get("insurance"),
@@ -361,13 +361,19 @@ export default function RegistryDashboard({
                     />
                   </label>
                   <label>
-                    Owner
+                    Owner account email
                     <input
-                      name="ownerName"
+                      name="ownerEmail"
+                      type="email"
                       className={field}
-                      defaultValue={selected?.ownerName || "Hifivebot"}
+                      defaultValue={selected?.owner?.email || ""}
+                      placeholder="owner@company.com"
                       required
                     />
+                    <span className="mt-1 block text-xs text-neutral-500">
+                      The account that owns this machine and may list it. It
+                      must already exist.
+                    </span>
                   </label>
                   <label>
                     Private location

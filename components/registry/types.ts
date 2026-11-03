@@ -18,7 +18,12 @@ export type RobotFile = {
 export type Robot = {
   id: string;
   version: number;
-  ownerName: string;
+  ownerId: string | null;
+  owner?: {
+    email: string | null;
+    name: string | null;
+    businessName: string | null;
+  } | null;
   modelId: string | null;
   model?: { brand: string; model: string } | null;
   serialNumber: string | null;

@@ -2,7 +2,7 @@
 import { FormEvent } from "react";
 import { RobotPanelProps, field, button } from "./types";
 import { prepareUpload } from "./prepareUpload";
-import { FILE_KIND_LABELS } from "./labels";
+import { FILE_KIND_LABELS, ownerDisplay } from "./labels";
 
 export default function IdentityPanel({
   robot,
@@ -102,7 +102,7 @@ export default function IdentityPanel({
           </label>
           <label className="block">
             <input type="checkbox" name="ownerConfirmed" required /> I confirm
-            the recorded owner is {robot.ownerName}. This is an internal
+            the owner is {ownerDisplay(robot)}. This is an internal
             confirmation.
           </label>
           <button className={button} disabled={busy}>

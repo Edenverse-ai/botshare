@@ -55,7 +55,7 @@ async function seed() {
           },
           body: JSON.stringify({
             modelId: model.id,
-            ownerName: "Hifivebot",
+            ownerEmail: process.env.REGISTRY_SEED_OWNER_EMAIL,
             notes: `TEST DRAFT ${number} — placeholder, real serial and evidence not supplied.`,
           }),
         }),

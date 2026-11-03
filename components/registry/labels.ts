@@ -102,6 +102,13 @@ export function recordRows(data: Record<string, unknown>) {
 type ModelName = { id: string; brand: string; model: string };
 
 /** Identity fields an administrator edits, with how to display each value. */
+/** How an owner reads on screen: their company, else their name, else their email. */
+export function ownerDisplay(robot: Partial<Robot>): string {
+  const o = robot.owner;
+  if (!o) return robot.ownerId ? "Unknown account" : "—";
+  return o.businessName || o.name || o.email || "Unknown account";
+}
+
 export function identityFields(
   robot: Partial<Robot>,
   models: ModelName[],
@@ -116,10 +123,15 @@ export function identityFields(
   const text = (v: unknown) =>
     v === null || v === undefined || v === "" ? "—" : String(v);
   const currency = robot.currency || "USD";
+
   return [
     { key: "modelId", label: "Robot model", show: modelName },
     { key: "serialNumber", label: "Manufacturer serial number", show: text },
-    { key: "ownerName", label: "Owner", show: text },
+    {
+      key: "ownerId",
+      label: "Owner",
+      show: () => ownerDisplay(robot),
+    },
     { key: "location", label: "Private location", show: text },
     { key: "insurance", label: "Insurance", show: text },
     { key: "tracker", label: "Tracker", show: text },

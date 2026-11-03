@@ -39,7 +39,7 @@ const draftFields = z
   .object({
     modelId: z.string().min(1).nullable().optional(),
     serialNumber: z.string().trim().max(100).nullable().optional(),
-    ownerName: text.min(1).optional(),
+    ownerEmail: z.string().trim().email().nullable().optional(),
     location: text.optional(),
     notes: text.optional(),
     insurance: text.optional(),
@@ -241,7 +241,10 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
                     ],
                   }
                 : {},
-              include: { model: { select: { brand: true, model: true } } },
+              include: {
+                model: { select: { brand: true, model: true } },
+                owner: { select: { email: true, name: true, businessName: true } },
+              },
               orderBy: { createdAt: "desc" },
               take: 200,
             }),
@@ -252,6 +255,7 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
             where: { id: parts[1] },
             include: {
               model: { select: { brand: true, model: true } },
+              owner: { select: { email: true, name: true, businessName: true } },
               files: { select: fileMetadata },
               records: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
               audit: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
@@ -298,20 +302,43 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
               );
             return prior.response;
           }
+          // The owner is an account, not a string: resolve the submitted email
+          // once, here, so every write path below works in ids.
+          async function resolveOwnerId(
+            email: string | null | undefined,
+          ): Promise<string | null | undefined> {
+            if (email === undefined) return undefined;
+            if (email === null) return null;
+            const owner = await tx.user.findFirst({
+              where: { email: { equals: email, mode: "insensitive" } },
+              select: { id: true },
+            });
+            if (!owner)
+              throw new RegistryError(
+                400,
+                `No Hifivebot account for ${email}. The owner must have an account before a robot can be registered to them.`,
+              );
+            return owner.id;
+          }
+
           let result: unknown;
           if (
             parts[0] === "robots" &&
             parts.length === 1 &&
             request.method === "POST"
           ) {
-            const data = draftFields.parse(body);
+            const { ownerEmail, ...data } = draftFields.parse(body);
             if (data.nameplateId || data.presentationId)
               throw new RegistryError(
                 400,
                 "Save the draft before attaching images.",
               );
             const robot = await tx.robotAsset.create({
-              data: { ...data, serialKey: serialKey(data.serialNumber) },
+              data: {
+                ...data,
+                ownerId: await resolveOwnerId(ownerEmail),
+                serialKey: serialKey(data.serialNumber),
+              },
             });
             await tx.robotAudit.create({
               data: {
@@ -328,8 +355,13 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
             parts.length === 2 &&
             request.method === "PATCH"
           ) {
-            const { version, reason, ownerConfirmed, ...data } =
+            const { version, reason, ownerConfirmed, ownerEmail, ...rest } =
               updateFields.parse(body);
+            const resolvedOwnerId = await resolveOwnerId(ownerEmail);
+            const data = {
+              ...rest,
+              ...(resolvedOwnerId === undefined ? {} : { ownerId: resolvedOwnerId }),
+            };
             const before = await tx.robotAsset.findUnique({
               where: { id: parts[1] },
             });
@@ -341,8 +373,8 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
               );
             const ownerChanged =
               !!before.publicId &&
-              data.ownerName !== undefined &&
-              data.ownerName !== before.ownerName;
+              data.ownerId !== undefined &&
+              data.ownerId !== before.ownerId;
             if (ownerChanged && !ownerConfirmed)
               throw new RegistryError(
                 400,
@@ -472,10 +504,10 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
                   409,
                   "The draft changed. Reload and review the owner and identity before confirming registration.",
                 );
-              if (!robot.model || !robot.serialKey || !robot.ownerName)
+              if (!robot.model || !robot.serialKey || !robot.ownerId)
                 throw new RegistryError(
                   400,
-                  "Model, manufacturer serial number and owner are required.",
+                  "Model, manufacturer serial number and owner account are required.",
                 );
               const nameplate = await tx.robotFile.findFirst({
                 where: {
@@ -514,11 +546,24 @@ export function createRegistryHandler({ db, actor: getActor }: Dependencies) {
                     version: { increment: 1 },
                   },
                 });
+                const confirmedOwner = await tx.user.findUnique({
+                  where: { id: robot.ownerId },
+                  select: { email: true, name: true, businessName: true },
+                });
                 await tx.robotAudit.create({
                   data: {
                     robotId: robot.id,
                     kind: "REGISTERED",
-                    data: jsonValue(result),
+                    data: jsonValue({
+                      ...(result as Record<string, unknown>),
+                      // The owner's name as confirmed. `businessName` can be
+                      // edited later; this is what was actually verified.
+                      confirmedOwnerName:
+                        confirmedOwner?.businessName ||
+                        confirmedOwner?.name ||
+                        confirmedOwner?.email ||
+                        null,
+                    }),
                     actorId: actor.id,
                     actorEmail: actor.email!,
                   },

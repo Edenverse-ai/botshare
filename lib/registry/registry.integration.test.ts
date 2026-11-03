@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, beforeAll } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { createRegistryHandler } from "./http";
@@ -27,6 +27,20 @@ const db = new PrismaClient({
   },
 });
 const actor = { id: "test-admin", email: "admin@registry.test" };
+const OWNER_EMAIL = "owner@registry.test";
+const OTHER_OWNER_EMAIL = "other-owner@registry.test";
+async function ensureOwners() {
+  for (const [id, email, businessName] of [
+    ["test-owner", OWNER_EMAIL, "Hifivebot"],
+    ["test-other-owner", OTHER_OWNER_EMAIL, "Another owner"],
+  ]) {
+    await db.user.upsert({
+      where: { id },
+      update: {},
+      create: { id, email, businessName },
+    });
+  }
+}
 const api = createRegistryHandler({ db, actor: async () => actor });
 async function request(
   path: string,
@@ -47,6 +61,7 @@ afterAll(() => db.$disconnect());
 const png =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC";
 async function registeredRobot() {
+  await ensureOwners();
   const model = await db.robotModel.create({
     data: {
       slug: randomUUID(),
@@ -63,6 +78,7 @@ async function registeredRobot() {
     await request("robots", "POST", {
       modelId: model.id,
       serialNumber: `TEST-${randomUUID()}`,
+      ownerEmail: OWNER_EMAIL,
       location: "PRIVATE-LOCATION",
     })
   ).json();
@@ -86,6 +102,10 @@ async function registeredRobot() {
 describe.skipIf(!enabled)(
   "Robot Registry request boundary (isolated Postgres)",
   () => {
+    // A robot belongs to an account, so the owner fixtures must exist before
+    // any draft names one.
+    beforeAll(ensureOwners);
+
     it("saves, reopens and edits an incomplete independent draft without duplicating retries", async () => {
       const key = randomUUID();
       const first = await request(
@@ -111,7 +131,7 @@ describe.skipIf(!enabled)(
       expect(update.status).toBe(200);
       const read = await (await request(`robots/${robot.id}`)).json();
       expect(read.location).toBe("Test storage");
-      expect(read.ownerName).toBe("Hifivebot");
+      expect(read.owner.email).toBe(OWNER_EMAIL);
       expect(read.audit.map((event: { kind: string }) => event.kind)).toEqual([
         "CREATED",
         "UPDATED",
@@ -587,7 +607,7 @@ describe.skipIf(!enabled)(
       const robot = await registeredRobot();
       const change = {
         version: robot.version,
-        ownerName: "Corrected test owner",
+        ownerEmail: OTHER_OWNER_EMAIL,
         reason: "Correct owner information",
       };
       expect(
@@ -603,7 +623,7 @@ describe.skipIf(!enabled)(
       expect(detail.publicId).toBe(robot.publicId);
       expect(
         detail.audit.find((a: { kind: string }) => a.kind === "REGISTERED").data
-          .ownerName,
+          .confirmedOwnerName,
       ).toBe("Hifivebot");
     });
     it("rejects future inspection results instead of treating a planned check as completed", async () => {
@@ -666,7 +686,7 @@ describe.skipIf(!enabled)(
       const updated = await (
         await request(`robots/${draft.id}`, "PATCH", {
           version: draft.version,
-          ownerName: "Another owner",
+          ownerEmail: OTHER_OWNER_EMAIL,
           reason: "Correct draft owner",
         })
       ).json();

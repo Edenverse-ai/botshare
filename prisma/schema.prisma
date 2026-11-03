@@ -54,6 +54,7 @@ model User {
   termsAcceptedVersion String?
   accounts             Account[]
   listings             Listing[]      @relation("ownerListings")
+  ownedRobots          RobotAsset[]   @relation("ownedRobots")
   reservations         Reservation[]
   favoriteListings     UserFavorite[]
 }
@@ -207,7 +208,8 @@ model RobotAsset {
   model            RobotModel?   @relation(fields: [modelId], references: [id], onDelete: Restrict)
   serialNumber     String?
   serialKey        String?       @unique
-  ownerName        String        @default("Hifivebot")
+  ownerId          String?
+  owner            User?         @relation("ownedRobots", fields: [ownerId], references: [id])
   location         String        @default("")
   notes            String        @default("")
   publicId         String?       @unique
@@ -235,6 +237,8 @@ model RobotAsset {
   files            RobotFile[]
   records          RobotRecord[]
   listings         Listing[]
+
+  @@index([ownerId])
 }
 
 // Optional tiered rental prices for a robot model, shared by every robot of that
